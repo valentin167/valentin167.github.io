@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrito de Compras</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="styless.css">
+</head>
+<body>
+    <header class="header">
+        <div class="menu container">
+            <a href="index.html" class="logo">logo</a>
+            <nav class="navbar">
+                <ul>
+                    <li><a class="btn-1" href="admin.html">Admin</a></li>
+                    <li><a class="btn btn-secondary" href="index.html"><span class="material-symbols-outlined">home</span></a></li>
+                    <li><a class="btn btn-secondary" href="cart.html"><span class="material-symbols-outlined">shopping_cart</span></a></li>
+                    <li><a class="btn btn-info" href="login.html" id="login-link">Iniciar Sesión</a></li>
+                    <li><a class="btn btn-info" href="signup.html" id="signup-link">Registro</a></li>
+                    <li><a class="btn btn-danger" href="" id="logout" style="display: none;">Cerrar Sesión</a></li>
+                </ul>
+            </nav>
+        </div>
+        <div class="header-content container">
+            <div class="header-txt">
+                <h1>Productos</h1>
+                <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Suscipit itaque, dicta repellat ad aspernatur facere totam enim a magni dolorum nam sapiente ullam nulla sint, optio perspiciatis sit quisquam. Fuga!</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="products">
+        <div class="row" id="product-list"></div>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>

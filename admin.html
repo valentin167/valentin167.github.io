@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Gestión de Productos</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="styless.css">
+</head>
+<body>
+    <header class="header">
+        <div class="menu container">
+            <a href="index.html" class="logo">logo</a>
+            <nav class="navbar">
+                <ul>
+                    <li><a class="btn btn-primary" href="admin.html">Admin</a></li>
+                    <li><a class="btn btn-secondary" href="index.html"><span class="material-symbols-outlined">home</span></a></li>
+                    <li><a class="btn btn-secondary" href="cart.html"><span class="material-symbols-outlined">shopping_cart</span></a></li>                    <li><a class="btn btn-info" href="login.html" id="login-link">Iniciar Sesión</a></li>
+                    <li><a class="btn btn-info" href="signup.html" id="signup-link">Registro</a></li>
+                    <li><a class="btn btn-danger" href="" id="logout" style="display: none;">Cerrar Sesión</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <h2>Gestión de Productos</h2>
+                <form id="product-form">
+                    <h3>Añadir Producto</h3>
+                    <label for="product-code">Código:</label>
+                    <input type="text" id="product-code" required>
+                    <label for="product-description">Descripción:</label>
+                    <input type="text" id="product-description" required>
+                    <label for="product-price">Precio:</label>
+                    <input type="number" id="product-price" required step="0.01">
+                    <button class="btn btn-primary" type="submit">Añadir Producto</button>
+                </form>
+            </div>
+            <div class="col-md-4 mb-4">
+                <h2>Lista de Productos</h2>
+                <table class="table table-responsive">
+                <thead>
+                    <tr>
+                        <th>Codigo</th>
+                        <th>Descripcion</th>
+                        <th>Precio</th>
+                    </tr>
+                </thead>
+                <tbody id="product-list">
+
+                </tbody>
+                </table>
+            </div>
+            <div class="col-md-5 mb-5">
+                <h2>Compras Pendientes</h2>
+                <table class="table table-responsive">
+                    <thead>
+                        <tr>
+                            <th>Id Usuario</th>
+                            <th>Articulos</th>
+                            <th>Total</th>
+                            <th>Direccion</th>
+                            <th>Fecha de pedido</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-orders-list">
+    
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-md-4 mb-4">
+                <h2>Pedidos entregados</h2>
+                <table class="table table-responsive">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Total</th>
+                            <th>Fecha de entrega</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sent-orders-list">
+    
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

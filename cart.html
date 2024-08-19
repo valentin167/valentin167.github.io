@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrito de Compras</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="styless.css">
+</head>
+<body>
+    <header class="header">
+        <div class="menu container">
+            <a href="index.html" class="logo">logo</a>
+            <nav class="navbar">
+                <ul>
+                    <li><a class="btn-1" href="admin.html">Admin</a></li>
+                    <li><a class="btn btn-secondary" href="index.html"><span class="material-symbols-outlined">home</span></a></li>
+                    <li><a class="btn btn-secondary" href="cart.html"><span class="material-symbols-outlined">shopping_cart</span></a></li>
+                    <li><a class="btn btn-info" href="login.html" id="login-link">Iniciar Sesión</a></li>
+                    <li><a class="btn btn-info" href="signup.html" id="signup-link">Registro</a></li>
+                    <li><a class="btn btn-danger" href="" id="logout" style="display: none;">Cerrar Sesión</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="wrapper">
+        <form >
+        <h1>Carrito de Compras</h1>
+            <div class="car-list">
+                <ul id="cart-items"></ul>
+            </div>
+
+            <div class="car-precio">
+                <h2>Total: $<span id="total-price">0.00</span></h2>
+            </div>
+            
+            <div class="input-box">
+                <label for="address" class="form-label">Dirección:</label>
+                <input type="text" id="address" required>
+            </div>
+
+        <button class="btn btn-primary" id="checkout">Finalizar Compra</button>
+        </form>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
