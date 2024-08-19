@@ -176,17 +176,18 @@ p {
     text-decoration: underline;
 }
 .products {
-    padding: 0 0 100px 0;
+    padding: 0 0 0 0;
     text-align: center;
 }
 
 .product {
-    width: 40%;
+    width: 20%;
     margin: 0 auto;
     box-sizing: border-box;
     text-align: center;
     box-shadow: 0 0 20px rgb(0, 0, 0 ,0.1);
     padding: 35px;
+    min-width: 75vh;
 }
 
 .product h2 {
@@ -220,4 +221,8 @@ button {
 
 #address {
     color:black;
+}
+.row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
 }
