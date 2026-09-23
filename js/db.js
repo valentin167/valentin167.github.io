@@ -148,7 +148,7 @@ function seedDatabaseIfNeeded() {
     categories: ['Remeras'],
     imgColor: '#C79A3D',
     sizeMin: 'S', sizeMax: 'XL',
-    branchesSold: ['suc_centro', 'suc_norte'],
+    branchesSold: ['suc_centro', 'suc_feria'],
     initialStock: 12, criticalStock: 5
   });
 
@@ -160,7 +160,7 @@ function seedDatabaseIfNeeded() {
     categories: ['Pantalones'],
     imgColor: '#3B5B84',
     sizeMin: 'S', sizeMax: 'XXL',
-    branchesSold: ['suc_centro', 'suc_norte'],
+    branchesSold: ['suc_centro', 'suc_feria'],
     initialStock: 8, criticalStock: 4
   });
 
@@ -184,7 +184,7 @@ function seedDatabaseIfNeeded() {
     categories: ['Vestidos', 'Accesorios'],
     imgColor: '#B85C8A',
     sizeMin: 'XS', sizeMax: 'L',
-    branchesSold: ['suc_norte'],
+    branchesSold: ['suc_feria'],
     initialStock: 6, criticalStock: 3
   });
 
@@ -196,7 +196,7 @@ function seedDatabaseIfNeeded() {
     categories: ['Calzado'],
     imgColor: '#7A7A7A',
     sizeMin: 'S', sizeMax: 'M',
-    branchesSold: ['suc_centro', 'suc_norte'],
+    branchesSold: ['suc_centro', 'suc_feria'],
     initialStock: 2, criticalStock: 4
   });
 
