@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuarios · SICO</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4>Usuarios</h4>
+          <div class="page-sub">Administradores y empleados del sistema</div>
+        </div>
+        <button class="btn btn-gold waves-effect" id="btnOpenAddUser"><i class="material-icons left">person_add</i>Registrar usuario</button>
+      </div>
+
+      <div class="card-panel">
+        <div class="filters-bar">
+          <div class="filter-field" style="min-width:220px;">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Buscar por nombre</label>
+            <input type="text" id="searchName" placeholder="Ej: María, Juan...">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Rol</label>
+            <select id="searchRole" class="browser-default">
+              <option value="">Todos los roles</option>
+              <option value="admin">Administrador</option>
+              <option value="empleado">Empleado</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Estado</label>
+            <select id="searchStatus" class="browser-default">
+              <option value="">Todos los estados</option>
+              <option value="activo">Activo</option>
+              <option value="baja">De baja</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <button class="btn btn-flat waves-effect" id="btnClearFilters">Limpiar filtros</button>
+          </div>
+        </div>
+
+        <table class="data-table responsive-table" style="margin-top:14px;">
+          <thead>
+            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th></tr>
+          </thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+        <div id="noUsersMsg" class="empty-state" style="display:none;">
+          <i class="material-icons">group</i>
+          <div>No hay usuarios para mostrar con los filtros actuales</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: registrar usuario -->
+  <div id="modalAddUser" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Registrar nuevo usuario</p>
+      <div class="input-field">
+        <input id="add_u_name" type="text">
+        <label for="add_u_name">Nombre completo</label>
+      </div>
+      <div class="input-field">
+        <input id="add_u_email" type="email">
+        <label for="add_u_email">Correo electrónico</label>
+      </div>
+      <div class="input-field">
+        <input id="add_u_password" type="text">
+        <label for="add_u_password">Contraseña</label>
+      </div>
+      <div class="input-field">
+        <select id="add_u_role">
+          <option value="empleado">Empleado</option>
+          <option value="admin">Administrador</option>
+        </select>
+        <label>Rol</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnSaveNewUser">Registrar</button>
+    </div>
+  </div>
+
+  <!-- Modal: editar usuario -->
+  <div id="modalEditUser" class="modal">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <p class="modal-title">Editar usuario</p>
+        <span id="edit_u_inactiveTag" class="inactive-tag" style="display:none;">Usuario dado de baja</span>
+      </div>
+      <input type="hidden" id="edit_u_id">
+      <div class="input-field">
+        <input id="edit_u_name" type="text">
+        <label for="edit_u_name" class="active">Nombre completo</label>
+      </div>
+      <div class="input-field">
+        <input id="edit_u_email" type="email">
+        <label for="edit_u_email" class="active">Correo electrónico</label>
+      </div>
+      <div class="input-field">
+        <select id="edit_u_role">
+          <option value="empleado">Empleado</option>
+          <option value="admin">Administrador</option>
+        </select>
+        <label>Rol</label>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;">
+      <button class="btn btn-danger waves-effect" id="btnDeactivateUser"><i class="material-icons left">block</i>Dar de baja</button>
+      <div>
+        <a href="#!" class="modal-close btn btn-flat">Descartar</a>
+        <button class="btn btn-gold waves-effect" id="btnSaveEditUser">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/usuarios.js"></script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock · SICO</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-critical-only="false">
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4>Stock</h4>
+          <div class="page-sub">Existencias de productos en la sucursal actual. Podés cargar ajustes de varios productos y guardarlos juntos.</div>
+        </div>
+        <span class="branch-chip"><i class="material-icons tiny">storefront</i> <span id="branchLabel"></span></span>
+      </div>
+
+      <div class="card-panel">
+        <div class="filters-bar">
+          <div class="filter-field" style="min-width:240px;">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Buscar por nombre</label>
+            <input type="text" id="searchName" placeholder="Ej: remera, jean...">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Categoría</label>
+            <select id="searchCategory" class="browser-default">
+              <option value="">Todas las categorías</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <button class="btn btn-flat waves-effect" id="btnClearFilters">Limpiar filtros</button>
+          </div>
+          <div class="filter-field" style="margin-left:auto;display:flex;gap:10px;">
+            <button class="btn btn-flat waves-effect" id="btnClearEntries" style="border:1px solid var(--border-soft);">
+              <i class="material-icons left">backspace</i>Limpiar ingresos
+            </button>
+            <button class="btn btn-gold waves-effect" id="btnSaveChanges">
+              <i class="material-icons left">save</i>Guardar cambios
+            </button>
+          </div>
+        </div>
+
+        <table class="data-table responsive-table" style="margin-top:14px;">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Nombre</th>
+              <th>Descripción</th>
+              <th>Categorías</th>
+              <th>Talles y stock</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="stockTbody"></tbody>
+        </table>
+        <div id="noStockMsg" class="empty-state" style="display:none;">
+          <i class="material-icons">inventory_2</i>
+          <div>No hay productos para mostrar con los filtros actuales</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: confirmación de cambios -->
+  <div id="modalConfirmAdjust" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Confirmar cambios de stock</p>
+      <div id="confirmAdjustList"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnAcceptAdjust">Aceptar</button>
+    </div>
+  </div>
+
+  <!-- Modal: transferir producto entre sucursales -->
+  <div id="modalTransferProduct" class="modal modal-fixed-footer">
+    <div class="modal-content">
+      <p class="modal-title">Transferir producto</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Producto: <strong id="transferProductName"></strong></p>
+
+      <div id="transferStepBranch">
+        <p style="font-weight:600;margin:16px 0 8px;">Elegí la sucursal de destino</p>
+        <div id="transferBranchList"></div>
+      </div>
+
+      <div id="transferStepQty" style="display:none;">
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:14px;">
+          De <strong id="transferFromBranch"></strong> hacia <strong id="transferToBranch"></strong>
+        </p>
+        <table class="data-table">
+          <thead><tr><th>Talle</th><th>Stock en origen</th><th>Cantidad a transferir</th></tr></thead>
+          <tbody id="transferQtyTbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+      <a href="#!" class="btn btn-flat" id="btnTransferBack" style="display:none;">
+        <i class="material-icons left">arrow_back</i>Volver
+      </a>
+      <div>
+        <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+        <button class="btn btn-gold waves-effect" id="btnSaveTransfer" style="display:none;">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: confirmación de transferencia -->
+  <div id="modalConfirmTransfer" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Confirmar transferencia de stock</p>
+      <div id="confirmTransferList"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnAcceptTransfer">Aceptar</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/stock.js"></script>
+</body>
+</html>

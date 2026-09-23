@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inicio · SICO</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4 id="greeting">Hola</h4>
+          <div class="page-sub">Resumen general de tu sucursal</div>
+        </div>
+        <span class="branch-chip"><i class="material-icons tiny">storefront</i> <span id="branchLabel"></span></span>
+      </div>
+
+      <div class="row" id="statsRow" style="margin-bottom:6px;">
+        <!-- stat cards -->
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="col s12 m6">
+          <div class="card-panel">
+            <h6 style="margin-top:0;font-weight:600;">Últimas ventas</h6>
+            <table class="data-table" id="lastSalesTable">
+              <thead><tr><th>Fecha</th><th>Usuario</th><th>Total</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div id="noSalesMsg" class="empty-state" style="display:none;padding:20px;">
+              <i class="material-icons">receipt_long</i>
+              <div>Todavía no hay ventas registradas</div>
+            </div>
+          </div>
+        </div>
+        <div class="col s12 m6">
+          <div class="card-panel">
+            <h6 style="margin-top:0;font-weight:600;">Productos con stock crítico</h6>
+            <table class="data-table" id="criticalTable">
+              <thead><tr><th>Producto</th><th>Talle</th><th>Stock</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div id="noCriticalMsg" class="empty-state" style="display:none;padding:20px;">
+              <i class="material-icons">check_circle</i>
+              <div>No hay productos en estado crítico</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+      <div class="col s12 m6">
+        <div class="card-panel">
+          <h6 style="margin-top:0;font-weight:600;">Funciones por implementar</h6>
+          <div style="padding:20px;">
+            <ul>
+              <li>Permisos de usuario</li>
+              <li>Permisos de sucursales</li>
+              <li>Agenda de clientes</li>
+              <li>Agenda de proveedores</li>
+              <li>Registro historico de ajustes de stock</li>
+              <li>Asignación de clientes a ventas</li>
+              <li>Reportes de ventas</li>
+              <li>Pedidos online</li>
+              <li>Notificaciones</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const session = nav_init('home');
+    if (session) {
+      document.getElementById('greeting').textContent = 'Hola, ' + session.name.split(' ')[0] + ' 👋';
+      document.getElementById('branchLabel').textContent = DB.getBranchName(session.branchId);
+
+      const products = DB.getProducts().filter(p => p.active);
+      const variants = DB.getVariants().filter(v => v.active);
+      const sales = DB.getSales().filter(s => s.branchId === session.branchId && !s.voided);
+      const users = DB.getUsers().filter(u => u.active);
+
+      let criticalItems = [];
+      variants.forEach(v => {
+        const prod = products.find(p => p.id === v.productId);
+        if (!prod) return;
+        const st = v.stock[session.branchId];
+        if (st && st.current <= st.critical) {
+          criticalItems.push({ prod, variant: v, stock: st });
+        }
+      });
+
+      const today = new Date().toDateString();
+      const salesToday = sales.filter(s => new Date(s.date).toDateString() === today);
+      const totalToday = salesToday.reduce((sum, s) => sum + s.total, 0);
+
+      const stats = [
+        { icon: 'checkroom', value: products.length, label: 'Productos activos' },
+        { icon: 'warning_amber', value: criticalItems.length, label: 'Prendas en stock crítico' },
+        { icon: 'point_of_sale', value: salesToday.length, label: 'Ventas hoy' },
+        { icon: 'payments', value: formatMoney(totalToday), label: 'Facturado hoy' },
+      ];
+      if (session.role === 'admin') {
+        stats.push({ icon: 'group', value: users.length, label: 'Usuarios activos' });
+      }
+
+      document.getElementById('statsRow').innerHTML = stats.map(s => `
+        <div class="col s12 m6 l${session.role === 'admin' ? '2' : '3'}" style="margin-bottom:16px;">
+          <div class="stat-card">
+            <div class="stat-icon"><i class="material-icons">${s.icon}</i></div>
+            <div>
+              <div class="stat-value">${s.value}</div>
+              <div class="stat-label">${s.label}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      // Últimas ventas
+      const lastSales = [...sales].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
+      if (lastSales.length === 0) {
+        document.getElementById('noSalesMsg').style.display = 'block';
+      } else {
+        document.querySelector('#lastSalesTable tbody').innerHTML = lastSales.map(s => `
+          <tr onclick="window.location.href='ventas.html'">
+            <td>${formatDateTime(s.date)}</td>
+            <td>${s.userName}</td>
+            <td>${formatMoney(s.total)}</td>
+          </tr>
+        `).join('');
+      }
+
+      // Críticos
+      if (criticalItems.length === 0) {
+        document.getElementById('noCriticalMsg').style.display = 'block';
+      } else {
+        document.querySelector('#criticalTable tbody').innerHTML = criticalItems.slice(0, 8).map(ci => `
+          <tr onclick="window.location.href='stock-critico.html'">
+            <td>${ci.prod.name}</td>
+            <td>${ci.variant.size}</td>
+            <td class="low-stock-text">${ci.stock.current} / mín. ${ci.stock.critical}</td>
+          </tr>
+        `).join('');
+      }
+    }
+  </script>
+</body>
+</html>

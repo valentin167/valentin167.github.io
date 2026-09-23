@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ventas · SICO</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .sale-item-row td { vertical-align: middle; }
+    .sale-item-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
+    .pct-input { width: 64px !important; margin: 0 !important; display: inline-block; }
+    .price-input { width: 100px !important; margin: 0 !important; }
+    .pay-select { width: 130px !important; }
+    .pick-result-item { display:flex; align-items:center; gap:12px; padding:10px; border-radius:8px; cursor:pointer; }
+    .pick-result-item:hover { background: var(--gold-100); }
+    .pick-result-item img { width:44px;height:44px;border-radius:6px;object-fit:cover; }
+    .size-btn { display:inline-block; padding:6px 12px; margin:3px; border:1.5px solid var(--border-soft); border-radius:6px; cursor:pointer; font-size:0.82rem; }
+    .size-btn:hover { border-color: var(--gold-500); background: var(--gold-100); }
+    .size-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+    .diff-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-soft); font-size:0.86rem; }
+    .diff-row:last-child { border-bottom:none; }
+    .void-item-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+    .void-item-row:last-child { border-bottom:none; }
+    .voided-row td { opacity: 0.55; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4>Ventas</h4>
+          <div class="page-sub">Registro y consulta de ventas de la sucursal actual</div>
+        </div>
+        <button class="btn btn-gold waves-effect" id="btnNewSale"><i class="material-icons left">point_of_sale</i>Registrar venta</button>
+      </div>
+
+      <div class="card-panel">
+        <div class="filters-bar">
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Desde</label>
+            <input type="datetime-local" id="filterDateMin">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Hasta</label>
+            <input type="datetime-local" id="filterDateMax">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);display:block;">Producto</label>
+            <button class="btn-flat btn-small" id="btnFilterProduct" style="border:1px solid var(--border-soft);">
+              <i class="material-icons left tiny">search</i><span id="filterProductLabel">Todos</span>
+            </button>
+          </div>
+          <div class="filter-field">
+            <button class="btn btn-flat waves-effect" id="btnClearFilters">Limpiar filtros</button>
+          </div>
+        </div>
+
+        <table class="data-table responsive-table" style="margin-top:14px;">
+          <thead>
+            <tr><th>Fecha y hora</th><th>Usuario</th><th>Sucursal</th><th>Monto total</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody id="salesTbody"></tbody>
+        </table>
+        <div id="noSalesMsg" class="empty-state" style="display:none;">
+          <i class="material-icons">receipt_long</i>
+          <div>No se encontraron ventas con los filtros aplicados</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: nueva venta -->
+  <div id="modalNewSale" class="modal modal-fixed-footer" style="max-width:900px;">
+    <div class="modal-content">
+      <p class="modal-title" id="saleModalTitle">Registrar venta</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Sucursal: <strong id="newSaleBranch"></strong></p>
+
+      <button class="btn btn-flat waves-effect" id="btnAddSaleItem" style="border:1.5px solid var(--navy-800);margin:10px 0;">
+        <i class="material-icons left">add_shopping_cart</i>Agregar producto
+      </button>
+
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="min-width:820px;">
+          <thead>
+            <tr>
+              <th>Producto</th><th>Talle</th><th>Color</th><th>Precio</th><th>Aum. %</th><th>Desc. %</th><th>Cantidad</th><th>Método de pago</th><th>Subtotal</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="saleItemsTbody"></tbody>
+        </table>
+      </div>
+      <div id="noItemsMsg" class="empty-state" style="padding:24px;">
+        <i class="material-icons">shopping_bag</i>
+        <div>Todavía no agregaste productos a la venta</div>
+      </div>
+
+      <div class="sale-total-bar">
+        <span style="color:var(--text-muted);">Total de la venta:</span>
+        <span class="total-amount" id="saleTotalAmount">$0,00</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat" id="btnCancelSale">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnSaveSale">Guardar venta</button>
+    </div>
+  </div>
+
+  <!-- Modal: buscar producto para agregar a la venta -->
+  <div id="modalPickProduct" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Buscar producto</p>
+      <div class="input-field">
+        <i class="material-icons prefix">search</i>
+        <input type="text" id="pickSearchInput" placeholder="Buscar por nombre...">
+      </div>
+      <div id="pickResultsList" style="max-height:280px;overflow-y:auto;"></div>
+      <div id="pickSizesWrap" style="display:none;margin-top:16px;">
+        <p style="font-weight:600;margin-bottom:6px;">Elegí el talle</p>
+        <div id="pickSizesList"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cerrar</a>
+    </div>
+  </div>
+
+  <!-- Modal: filtrar por producto -->
+  <div id="modalFilterProduct" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Filtrar por producto</p>
+      <div class="input-field">
+        <i class="material-icons prefix">search</i>
+        <input type="text" id="filterSearchInput" placeholder="Buscar por nombre...">
+      </div>
+      <div id="filterResultsList" style="max-height:320px;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cerrar</a>
+    </div>
+  </div>
+
+  <!-- Modal: detalle de venta -->
+  <div id="modalSaleDetail" class="modal modal-fixed-footer">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <p class="modal-title">Detalle de venta</p>
+        <span id="saleDetailVoidedTag" class="inactive-tag" style="display:none;">Venta anulada</span>
+      </div>
+      <input type="hidden" id="saleDetailId">
+      <div id="saleDetailMeta" style="color:var(--text-muted);font-size:0.88rem;margin-bottom:14px;"></div>
+      <table class="data-table">
+        <thead><tr><th>Producto</th><th>Talle</th><th>Cant.</th><th>Precio unit.</th><th>Subtotal</th></tr></thead>
+        <tbody id="saleDetailItems"></tbody>
+      </table>
+      <div class="sale-total-bar">
+        <span style="color:var(--text-muted);">Total:</span>
+        <span class="total-amount" id="saleDetailTotal">$0,00</span>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;">
+      <div id="saleDetailActions">
+        <button class="btn btn-flat waves-effect" id="btnOpenEditSale" style="border:1px solid var(--border-soft);">
+          <i class="material-icons left">edit</i>Modificar
+        </button>
+        <button class="btn btn-danger waves-effect" id="btnOpenVoidSale">
+          <i class="material-icons left">undo</i>Anular (devolución)
+        </button>
+      </div>
+      <a href="#!" class="modal-close btn btn-flat">Cerrar</a>
+    </div>
+  </div>
+
+  <!-- Modal: confirmar cambios de una edición de venta -->
+  <div id="modalConfirmEditSale" class="modal modal-fixed-footer">
+    <div class="modal-content">
+      <p class="modal-title">Confirmar modificación de venta</p>
+
+      <p style="font-weight:600;margin-bottom:6px;">Movimientos de stock</p>
+      <div id="editStockMovesList" style="margin-bottom:18px;"></div>
+
+      <p style="font-weight:600;margin-bottom:6px;">Cambios en la venta</p>
+      <div id="editSaleChangesList"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnAcceptEditSale">Aceptar</button>
+    </div>
+  </div>
+
+  <!-- Modal: confirmar anulación / devolución de venta -->
+  <div id="modalConfirmVoidSale" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Confirmar anulación de venta</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Se devolverán al stock los siguientes productos:</p>
+      <div id="voidStockList" style="margin-top:10px;"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-danger waves-effect" id="btnAcceptVoidSale">Anular venta</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/ventas.js"></script>
+</body>
+</html>

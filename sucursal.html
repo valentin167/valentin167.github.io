@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elegir sucursal · SICO</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="branch-select-card">
+      <div class="auth-logo" style="margin:0 auto 14px;">SICO</div>
+      <h5>¿Dónde vas a trabajar hoy?</h5>
+      <div class="auth-sub" id="welcomeText">Elegí tu sucursal para continuar</div>
+      <div id="branchList" style="margin-top:18px;"></div>
+      <a href="#" id="logoutLink" style="font-size:0.82rem;color:var(--text-muted);">Cerrar sesión</a>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    const session = auth_requireLogin();
+    if (session) {
+      document.getElementById('welcomeText').textContent = 'Hola ' + session.name.split(' ')[0] + ', elegí tu sucursal para continuar';
+      const branches = DB.getBranches();
+      document.getElementById('branchList').innerHTML = branches.map(b => `
+        <div class="branch-option" data-id="${b.id}">
+          <i class="material-icons">storefront</i>
+          <div>
+            <div class="b-name">${b.name}</div>
+            <div class="b-sub">Trabajar en esta sucursal</div>
+          </div>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.branch-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+          auth_setBranch(opt.dataset.id);
+          window.location.href = 'home.html';
+        });
+      });
+    }
+
+    document.getElementById('logoutLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      auth_logout();
+    });
+  </script>
+</body>
+</html>

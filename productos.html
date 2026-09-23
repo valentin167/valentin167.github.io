@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productos · SICO</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .stock-fields-table th, .stock-fields-table td { padding: 6px 10px; }
+    .branch-check-list label { margin-right: 22px; color: var(--text-main); }
+    .photo-preview { width: 110px; height: 110px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border-soft); }
+    .cat-chips { border: 1px solid var(--border-soft) !important; border-radius: 8px; padding: 6px 10px !important; box-shadow: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4>Productos</h4>
+          <div class="page-sub">Catálogo general de productos de la tienda</div>
+        </div>
+        <span class="branch-chip"><i class="material-icons tiny">storefront</i> <span id="branchLabel"></span></span>
+      </div>
+
+      <div class="card-panel">
+        <div class="filters-bar">
+          <div class="filter-field" style="min-width:240px;">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Buscar por nombre</label>
+            <input type="text" id="searchName" placeholder="Ej: remera, jean...">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Categoría</label>
+            <select id="searchCategory" class="browser-default">
+              <option value="">Todas las categorías</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <button class="btn btn-flat waves-effect" id="btnClearFilters">Limpiar filtros</button>
+          </div>
+          <div class="filter-field" style="margin-left:auto">
+           <button style="margin:auto" class="btn btn-gold waves-effect" id="btnOpenAdd"><i class="material-icons left">add</i>Agregar producto</button>
+          </div>
+
+        </div>
+
+
+        <table class="data-table responsive-table" style="margin-top:14px;">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Nombre</th>
+              <th>Descripción</th>
+              <th>Categorías</th>
+              <th>Talles</th>
+              <th>Precio</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="productsTbody"></tbody>
+        </table>
+        <div id="noProductsMsg" class="empty-state" style="display:none;">
+          <i class="material-icons">checkroom</i>
+          <div>No hay productos para mostrar con los filtros actuales</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: AGREGAR PRODUCTO ===================== -->
+  <div id="modalAddProduct" class="modal modal-fixed-footer">
+    <div class="modal-content">
+      <p class="modal-title">Nuevo producto</p>
+      <div class="row" style="margin-bottom:0;">
+        <div class="col s12 m8">
+          <div class="row">
+            <div class="input-field col s12">
+              <input id="add_name" type="text">
+              <label for="add_name">Nombre del producto</label>
+            </div>
+            <div class="input-field col s12">
+              <textarea id="add_description" class="materialize-textarea"></textarea>
+              <label for="add_description">Descripción</label>
+            </div>
+            <div class="input-field col s6">
+              <input id="add_color" type="text">
+              <label for="add_color">Color</label>
+            </div>
+          </div>
+        </div>
+        <div class="col s12 m4" style="text-align:center;">
+          <img id="add_photoPreview" class="photo-preview" src="">
+          <div class="file-field input-field" style="margin-top:10px;">
+            <div class="btn-flat btn-small" style="border:1px solid var(--border-soft);">
+              <span>Foto</span>
+              <input type="file" id="add_photoInput" accept="image/*">
+            </div>
+            <div class="file-path-wrapper">
+              <input class="file-path" type="text" placeholder="Elegir imagen">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:10px;">
+        <div class="col s12">
+          <label style="font-size:0.8rem;color:var(--text-muted);">Categorías (podés elegir más de una, escribí y presioná Enter)</label>
+          <div class="chips cat-chips" id="add_categoryChips"></div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:10px;">
+        <div class="input-field col s6">
+          <select id="add_sizeMin"></select>
+          <label>Talle mínimo</label>
+        </div>
+        <div class="input-field col s6">
+          <select id="add_sizeMax"></select>
+          <label>Talle máximo</label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:6px;">
+        <div class="col s12">
+          <label style="font-size:0.8rem;color:var(--text-muted);">¿En qué sucursales se vende?</label>
+          <div class="branch-check-list" id="add_branchChecks" style="margin-top:6px;"></div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:0;">
+        <div class="col s12">
+          <label style="font-size:0.8rem;color:var(--text-muted);">Precio base por sucursal (se autocompleta en cada talle; podés editarlo por talle en la tabla de abajo)</label>
+          <div class="row" id="add_basePriceWrap" style="margin-top:6px;margin-bottom:0;"></div>
+        </div>
+      </div>
+
+      <div id="add_stockFieldsWrap"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnSaveNewProduct">Guardar producto</button>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: EDITAR PRODUCTO ===================== -->
+  <div id="modalEditProduct" class="modal modal-fixed-footer">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <p class="modal-title">Editar producto</p>
+        <span id="edit_inactiveTag" class="inactive-tag" style="display:none;">Producto dado de baja</span>
+      </div>
+      <input type="hidden" id="edit_productId">
+      <div class="row" style="margin-bottom:0;">
+        <div class="col s12 m8">
+          <div class="row">
+            <div class="input-field col s12">
+              <input id="edit_name" type="text">
+              <label for="edit_name" class="active">Nombre del producto</label>
+            </div>
+            <div class="input-field col s12">
+              <textarea id="edit_description" class="materialize-textarea"></textarea>
+              <label for="edit_description" class="active">Descripción</label>
+            </div>
+            <div class="input-field col s6">
+              <input id="edit_color" type="text">
+              <label for="edit_color" class="active">Color</label>
+            </div>
+          </div>
+        </div>
+        <div class="col s12 m4" style="text-align:center;">
+          <img id="edit_photoPreview" class="photo-preview" src="">
+          <div class="file-field input-field" style="margin-top:10px;">
+            <div class="btn-flat btn-small" style="border:1px solid var(--border-soft);">
+              <span>Cambiar</span>
+              <input type="file" id="edit_photoInput" accept="image/*">
+            </div>
+            <div class="file-path-wrapper">
+              <input class="file-path" type="text" placeholder="Elegir imagen">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:10px;">
+        <div class="col s12">
+          <label style="font-size:0.8rem;color:var(--text-muted);">Categorías</label>
+          <div class="chips cat-chips" id="edit_categoryChips"></div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:10px;">
+        <div class="input-field col s6">
+          <select id="edit_sizeMin"></select>
+          <label>Talle mínimo</label>
+        </div>
+        <div class="input-field col s6">
+          <select id="edit_sizeMax"></select>
+          <label>Talle máximo</label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:6px;">
+        <div class="col s12">
+          <label style="font-size:0.8rem;color:var(--text-muted);">¿En qué sucursales se vende?</label>
+          <div class="branch-check-list" id="edit_branchChecks" style="margin-top:6px;"></div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:0;">
+        <div class="col s12">
+          <label style="font-size:0.8rem;color:var(--text-muted);">Precio base por sucursal (se autocompleta en cada talle; podés editarlo por talle en la tabla de abajo)</label>
+          <div class="row" id="edit_basePriceWrap" style="margin-top:6px;margin-bottom:0;"></div>
+        </div>
+      </div>
+
+      <div id="edit_stockFieldsWrap"></div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;">
+      <button class="btn btn-danger waves-effect" id="btnDeactivateProduct"><i class="material-icons left">block</i>Dar de baja</button>
+      <div>
+        <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+        <button class="btn btn-gold waves-effect" id="btnSaveEditProduct">Confirmar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/productos.js"></script>
+</body>
+</html>
