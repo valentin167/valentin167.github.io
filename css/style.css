@@ -93,7 +93,7 @@ a { color: var(--gold-500); }
   padding: 11px 14px;
   margin-bottom: 3px;
   border-radius: 8px;
-  color: #C6CBD3;
+  color: #fff;
   font-size: 0.92rem;
   font-weight: 500;
   text-decoration: none;
@@ -102,7 +102,7 @@ a { color: var(--gold-500); }
 
 .sidebar-nav a.side-link i.material-icons {
   font-size: 20px;
-  color: #8B93A0;
+  color: #fff;
   transition: color 0.15s ease;
 }
 
@@ -117,7 +117,7 @@ a { color: var(--gold-500); }
 }
 
 .sidebar-nav a.side-link.active i.material-icons {
-  color: var(--gold-400);
+  color: var(--gold-100);
 }
 
 .sidebar-nav .nav-section-label {
@@ -190,7 +190,7 @@ a { color: var(--gold-500); }
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #E9EBEE;
+  color: #E9EBEE  ;
   font-size: 0.86rem;
   cursor: pointer;
   transition: background 0.12s ease;
