@@ -117,7 +117,7 @@ a { color: var(--gold-500); }
 }
 
 .sidebar-nav a.side-link.active i.material-icons {
-  color: var(--gold-100);
+  color: var(--gold-400);
 }
 
 .sidebar-nav .nav-section-label {
