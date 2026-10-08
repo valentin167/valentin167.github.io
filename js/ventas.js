@@ -1,17 +1,23 @@
 /* ==========================================================================
-   ventas.js — Registro de ventas (con descuento automático de stock),
-   listado/filtrado/detalle, y modificación / anulación (devolución) de
-   ventas ya registradas.
+   ventas.js — Registro de ventas en dos pasos (selección de productos por
+   lotes + precio/porcentaje global y pago), con descuento automático de
+   stock, listado/filtrado/detalle, y modificación / anulación (devolución)
+   de ventas ya registradas.
    ========================================================================== */
 
 let VENTAS_session = null;
 let SALE_cart = [];
+let SALE_increasePct = 0;            // % de aumento aplicado a toda la venta
+let SALE_discountPct = 0;            // % de descuento aplicado a toda la venta
+let SALE_paymentMethod = null;       // método de pago aplicado a toda la venta
 let SALE_editMode = null;            // null = venta nueva, string = id de venta que se está modificando
 let SALE_editOriginalItems = [];     // snapshot de los items originales de la venta en edición
+let SALE_editOriginalGlobal = { increasePct: 0, discountPct: 0, paymentMethod: null }; // snapshot del % y pago global original
+let SALE_editOriginalCustomer = { phone: null, name: null }; // snapshot del cliente original, al modificar
 let CURRENT_saleDetailId = null;     // venta actualmente abierta en el modal de detalle
 let FILTER_productId = null;
 
-let modalNewSaleInst, modalPickProductInst, modalFilterProductInst,
+let modalNewSaleInst, modalFilterProductInst,
     modalSaleDetailInst, modalConfirmEditSaleInst, modalConfirmVoidSaleInst;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,16 +27,22 @@ document.addEventListener('DOMContentLoaded', () => {
   modalNewSaleInst = M.Modal.init(document.getElementById('modalNewSale'), {
     onCloseStart: resetSaleCart
   });
-  modalPickProductInst = M.Modal.init(document.getElementById('modalPickProduct'), {});
   modalFilterProductInst = M.Modal.init(document.getElementById('modalFilterProduct'), {});
   modalSaleDetailInst = M.Modal.init(document.getElementById('modalSaleDetail'), {});
   modalConfirmEditSaleInst = M.Modal.init(document.getElementById('modalConfirmEditSale'), {});
   modalConfirmVoidSaleInst = M.Modal.init(document.getElementById('modalConfirmVoidSale'), {});
 
   document.getElementById('btnNewSale').addEventListener('click', openNewSaleModal);
-  document.getElementById('btnAddSaleItem').addEventListener('click', openPickProductModal);
+  document.getElementById('saleCustomerPhone').addEventListener('input', onCustomerPhoneChange);
+  document.getElementById('saleSearchInput').addEventListener('input', renderSaleSearchResults);
+  document.getElementById('btnSaleContinue').addEventListener('click', goToPricingStep);
+  document.getElementById('btnSaleBack').addEventListener('click', goToSelectStep);
   document.getElementById('btnSaveSale').addEventListener('click', onSaveSaleClick);
-  document.getElementById('pickSearchInput').addEventListener('input', renderPickResults);
+  document.getElementById('saleIncreasePct').addEventListener('input', onGlobalPctChange);
+  document.getElementById('saleDiscountPct').addEventListener('input', onGlobalPctChange);
+  fillSalePaymentSelect();
+  document.getElementById('salePaymentMethod').addEventListener('change', onGlobalPctChange);
+
   document.getElementById('btnFilterProduct').addEventListener('click', openFilterProductModal);
   document.getElementById('filterSearchInput').addEventListener('input', renderFilterResults);
   document.getElementById('btnClearFilters').addEventListener('click', clearFilters);
@@ -62,25 +74,124 @@ function getCartQty(variantId) {
 
 function availableStockForVariant(variantId) {
   const v = DB.getVariants().find(v => v.id === variantId);
-  const current = v && v.stock[VENTAS_session.branchId] ? v.stock[VENTAS_session.branchId].current : 0;
-  return current + getOriginalQty(variantId);
+  // Disponible = físico - reservado por pedidos confirmados (+ lo que esta misma venta ya tenía)
+  const available = v ? availableStock(v.stock[VENTAS_session.branchId]) : 0;
+  return available + getOriginalQty(variantId);
+}
+
+/* ---------------------- Pasos del modal (selección → precio/pago) ---------------------- */
+function showSelectStepUI() {
+  document.getElementById('saleStepSelect').style.display = 'block';
+  document.getElementById('saleStepPricing').style.display = 'none';
+  document.getElementById('btnSaleBack').style.display = 'none';
+  document.getElementById('btnSaleContinue').style.display = 'inline-block';
+  document.getElementById('btnSaveSale').style.display = 'none';
+}
+
+function showPricingStepUI() {
+  document.getElementById('saleStepSelect').style.display = 'none';
+  document.getElementById('saleStepPricing').style.display = 'block';
+  document.getElementById('btnSaleBack').style.display = 'inline-block';
+  document.getElementById('btnSaleContinue').style.display = 'none';
+  document.getElementById('btnSaveSale').style.display = 'inline-block';
+}
+
+function goToPricingStep() {
+  if (SALE_cart.length === 0) {
+    M.toast({ html: 'Seleccioná al menos un producto antes de continuar.' });
+    return;
+  }
+  showPricingStepUI();
+  renderSaleItemsTable();
+}
+
+function goToSelectStep() {
+  showSelectStepUI();
+  renderSaleSearchResults();
+  renderSelectionSummary();
+}
+
+/* ---------------------- Cliente de la venta (opcional) ----------------------
+   El teléfono es el dato único: si coincide con un cliente ya registrado se
+   autocompleta su nombre; si es un teléfono nuevo, el nombre ingresado
+   registra un cliente nuevo en el sistema. Sin teléfono, el nombre (si hay)
+   queda guardado solo en esa venta. Sin ninguno de los dos datos, la venta
+   queda anónima. */
+function onCustomerPhoneChange() {
+  const phone = document.getElementById('saleCustomerPhone').value.trim();
+  if (phone !== '') {
+    const customer = DB.findCustomerByPhone(phone);
+    if (customer) document.getElementById('saleCustomerName').value = customer.name;
+  }
+  updateCustomerStatusDisplay();
+}
+
+function updateCustomerStatusDisplay() {
+  const phone = document.getElementById('saleCustomerPhone').value.trim();
+  const statusEl = document.getElementById('saleCustomerStatus');
+  if (phone === '') { statusEl.innerHTML = ''; return; }
+  const customer = DB.findCustomerByPhone(phone);
+  statusEl.innerHTML = customer
+    ? '<span style="color:var(--success);font-weight:600;">✓ Cliente existente</span>'
+    : '<span style="color:var(--gold-500);font-weight:600;">Cliente nuevo</span>';
+}
+
+/* Lee los campos de cliente y resuelve qué corresponde hacer al guardar.
+   Devuelve { error } si falta el nombre de un teléfono nuevo, o
+   { phone, name, isNewCustomer } en caso contrario (ambos pueden ser null
+   para una venta anónima). */
+function resolveSaleCustomer() {
+  const phone = document.getElementById('saleCustomerPhone').value.trim();
+  const name = document.getElementById('saleCustomerName').value.trim();
+
+  if (phone === '') {
+    return { phone: null, name: name || null, isNewCustomer: false };
+  }
+
+  const existing = DB.findCustomerByPhone(phone);
+  if (existing) {
+    return { phone, name: name || existing.name, isNewCustomer: false };
+  }
+
+  if (!name) {
+    return { error: 'Ese teléfono no está registrado. Ingresá el nombre del cliente para registrarlo.' };
+  }
+  return { phone, name, isNewCustomer: true };
 }
 
 /* ---------------------- Registrar / modificar venta ---------------------- */
 function resetSaleCart() {
   SALE_cart = [];
+  SALE_increasePct = 0;
+  SALE_discountPct = 0;
+  SALE_paymentMethod = PAYMENT_METHODS[0];
   SALE_editMode = null;
   SALE_editOriginalItems = [];
+  SALE_editOriginalCustomer = { phone: null, name: null };
 }
 
 function openNewSaleModal() {
   SALE_editMode = null;
   SALE_editOriginalItems = [];
+  SALE_editOriginalCustomer = { phone: null, name: null };
   SALE_cart = [];
+  SALE_increasePct = 0;
+  SALE_discountPct = 0;
+  SALE_paymentMethod = PAYMENT_METHODS[0];
+
   document.getElementById('saleModalTitle').textContent = 'Registrar venta';
-  document.getElementById('btnSaveSale').textContent = 'Guardar venta';
   document.getElementById('newSaleBranch').textContent = DB.getBranchName(VENTAS_session.branchId);
-  renderSaleItemsTable();
+  document.getElementById('saleCustomerPhone').value = '';
+  document.getElementById('saleCustomerName').value = '';
+  document.getElementById('saleCustomerStatus').innerHTML = '';
+  document.getElementById('saleSearchInput').value = '';
+  document.getElementById('saleIncreasePct').value = 0;
+  document.getElementById('saleDiscountPct').value = 0;
+  document.getElementById('salePaymentMethod').value = SALE_paymentMethod;
+
+  showSelectStepUI();
+  renderSaleSearchResults();
+  renderSelectionSummary();
   modalNewSaleInst.open();
 }
 
@@ -94,6 +205,25 @@ function openEditSaleModal(saleId) {
 
   SALE_editMode = sale.id;
   SALE_editOriginalItems = JSON.parse(JSON.stringify(sale.items));
+  SALE_editOriginalGlobal = {
+    increasePct: sale.increasePct || 0,
+    discountPct: sale.discountPct || 0,
+    paymentMethod: sale.paymentMethod || PAYMENT_METHODS[0]
+  };
+  SALE_increasePct = SALE_editOriginalGlobal.increasePct;
+  SALE_discountPct = SALE_editOriginalGlobal.discountPct;
+  SALE_paymentMethod = SALE_editOriginalGlobal.paymentMethod;
+
+  SALE_editOriginalCustomer = {
+    phone: sale.customerPhone || null,
+    name: sale.customerName || null
+  };
+
+  // Ventas guardadas antes de este cambio no tenían % global: en ese caso
+  // el precio final ya quedó fijado en unitPrice, así que lo usamos como
+  // base (priceList) y dejamos el % global en 0 para no duplicar el ajuste.
+  const hasGlobalPct = sale.increasePct !== undefined || sale.discountPct !== undefined;
+
   SALE_cart = sale.items.map(it => ({
     variantId: it.variantId,
     productId: it.productId,
@@ -102,31 +232,29 @@ function openEditSaleModal(saleId) {
     size: it.size,
     color: it.color,
     photo: it.photo,
-    priceList: it.priceList,
-    increasePct: it.increasePct || 0,
-    discountPct: it.discountPct || 0,
-    quantity: it.quantity,
-    paymentMethod: it.paymentMethod
+    priceList: hasGlobalPct ? it.priceList : it.unitPrice,
+    quantity: it.quantity
   }));
 
   document.getElementById('saleModalTitle').textContent = 'Modificar venta';
-  document.getElementById('btnSaveSale').textContent = 'Guardar cambios';
   document.getElementById('newSaleBranch').textContent = DB.getBranchName(sale.branchId);
+  document.getElementById('saleCustomerPhone').value = sale.customerPhone || '';
+  document.getElementById('saleCustomerName').value = sale.customerName || '';
+  updateCustomerStatusDisplay();
+  document.getElementById('saleSearchInput').value = '';
+  document.getElementById('saleIncreasePct').value = SALE_increasePct;
+  document.getElementById('saleDiscountPct').value = SALE_discountPct;
+  document.getElementById('salePaymentMethod').value = SALE_paymentMethod;
 
   modalSaleDetailInst.close();
+  showPricingStepUI();
   renderSaleItemsTable();
   modalNewSaleInst.open();
 }
 
-function openPickProductModal() {
-  document.getElementById('pickSearchInput').value = '';
-  document.getElementById('pickSizesWrap').style.display = 'none';
-  renderPickResults();
-  modalPickProductInst.open();
-}
-
-function renderPickResults() {
-  const term = document.getElementById('pickSearchInput').value.trim().toLowerCase();
+/* ---------------------- Paso 1: selección de productos por lotes ---------------------- */
+function renderSaleSearchResults() {
+  const term = document.getElementById('saleSearchInput').value.trim().toLowerCase();
   const branchId = VENTAS_session.branchId;
   const products = DB.getProducts().filter(p =>
     p.active &&
@@ -134,45 +262,68 @@ function renderPickResults() {
     (term === '' || p.name.toLowerCase().includes(term))
   );
 
-  const list = document.getElementById('pickResultsList');
+  const container = document.getElementById('saleSearchResults');
   if (products.length === 0) {
-    list.innerHTML = `<p style="color:var(--text-muted);padding:10px;">No se encontraron productos.</p>`;
+    container.innerHTML = `<p style="color:var(--text-muted);padding:10px 0;">No se encontraron productos.</p>`;
     return;
   }
 
-  list.innerHTML = products.map(p => `
-    <div class="pick-result-item" onclick="selectPickProduct('${p.id}')">
-      <img src="${p.photo}">
-      <div>
-        <div style="font-weight:600;">${p.name}</div>
-        <div style="font-size:0.78rem;color:var(--text-muted);">${p.color} · desde ${formatMoney(p.basePrice ? (p.basePrice[branchId] || 0) : 0)}</div>
+  container.innerHTML = products.map(p => {
+    const variants = DB.getVariantsByProduct(p.id)
+      .filter(v => v.active && v.stock[branchId])
+      .sort((a, b) => SIZES.indexOf(a.size) - SIZES.indexOf(b.size));
+
+    const sizesHtml = variants.map(v => {
+      const inCart = getCartQty(v.id);
+      const remaining = availableStockForVariant(v.id) - inCart;
+      const disabled = remaining <= 0;
+      const price = v.stock[branchId].price;
+      return `<span class="size-btn ${disabled ? 'disabled' : ''} ${inCart > 0 ? 'in-cart' : ''}"
+                    ${disabled ? '' : `onclick="addToCart('${p.id}','${v.id}')"`}>
+                ${v.size} · ${formatMoney(price)}
+                <small style="color:var(--text-muted);">(${remaining}${inCart > 0 ? ' · en venta: ' + inCart : ''})</small>
+              </span>`;
+    }).join('') || '<span style="color:var(--text-muted);font-size:0.8rem;">Sin talles disponibles</span>';
+
+    return `
+      <div class="search-product-row">
+        <img src="${p.photo}">
+        <div style="flex:1;">
+          <div style="font-weight:600;">${p.name}</div>
+          <div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:4px;">${p.color}</div>
+          <div>${sizesHtml}</div>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
-function selectPickProduct(productId) {
-  const branchId = VENTAS_session.branchId;
-  const variants = DB.getVariantsByProduct(productId)
-    .filter(v => v.active && v.stock[branchId])
-    .sort((a, b) => SIZES.indexOf(a.size) - SIZES.indexOf(b.size));
+function renderSelectionSummary() {
+  const list = document.getElementById('saleSelectionSummary');
+  const emptyMsg = document.getElementById('noSelectionMsg');
 
-  const wrap = document.getElementById('pickSizesWrap');
-  const sizesList = document.getElementById('pickSizesList');
-  wrap.style.display = 'block';
-
-  sizesList.innerHTML = variants.map(v => {
-    const remaining = availableStockForVariant(v.id) - getCartQty(v.id);
-    const disabled = remaining <= 0;
-    const price = v.stock[branchId].price;
-    return `<span class="size-btn ${disabled ? 'disabled' : ''}" ${disabled ? '' : `onclick="addToCart('${productId}','${v.id}')"`}>
-              ${v.size} · ${formatMoney(price)} <small style="color:var(--text-muted);">(${remaining})</small>
-            </span>`;
-  }).join('');
-
-  if (variants.length === 0) {
-    sizesList.innerHTML = '<p style="color:var(--text-muted);">Este producto no tiene talles disponibles.</p>';
+  if (SALE_cart.length === 0) {
+    emptyMsg.style.display = 'block';
+    list.innerHTML = '';
+    return;
   }
+  emptyMsg.style.display = 'none';
+
+  list.innerHTML = SALE_cart.map((item, idx) => `
+    <div class="selection-row">
+      <img class="sale-item-thumb" src="${item.photo}">
+      <div style="flex:1;">
+        <div style="font-weight:600;">${item.name}</div>
+        <div style="font-size:0.76rem;color:var(--text-muted);">Talle ${item.size} · ${item.color}</div>
+      </div>
+      <div class="qty-stepper">
+        <button type="button" onclick="changeQty(${idx},-1)">−</button>
+        <input type="number" min="1" value="${item.quantity}" onchange="updateCartField(${idx},'quantity',this.value)">
+        <button type="button" onclick="changeQty(${idx},1)">+</button>
+      </div>
+      <i class="material-icons" style="cursor:pointer;color:var(--danger);" onclick="removeCartItem(${idx})">close</i>
+    </div>
+  `).join('');
 }
 
 function addToCart(productId, variantId) {
@@ -203,25 +354,34 @@ function addToCart(productId, variantId) {
       color: product.color,
       photo: product.photo,
       priceList: variantPrice,
-      increasePct: 0,
-      discountPct: 0,
-      quantity: 1,
-      paymentMethod: PAYMENT_METHODS[0]
+      quantity: 1
     });
   }
-  modalPickProductInst.close();
+  refreshCartViews();
+}
+
+/* ---------------------- Paso 2: precio, % global y pago ---------------------- */
+function fillSalePaymentSelect() {
+  const select = document.getElementById('salePaymentMethod');
+  select.innerHTML = PAYMENT_METHODS.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function onGlobalPctChange() {
+  SALE_increasePct = parseFloat(document.getElementById('saleIncreasePct').value) || 0;
+  SALE_discountPct = parseFloat(document.getElementById('saleDiscountPct').value) || 0;
+  SALE_paymentMethod = document.getElementById('salePaymentMethod').value;
   renderSaleItemsTable();
 }
 
-function computeItemUnit(item) {
+function computeItemUnit(item, incPct, discPct) {
   const base = Number(item.priceList) || 0;
-  const inc = Number(item.increasePct) || 0;
-  const disc = Number(item.discountPct) || 0;
+  const inc = incPct !== undefined ? incPct : SALE_increasePct;
+  const disc = discPct !== undefined ? discPct : SALE_discountPct;
   return base * (1 + inc / 100 - disc / 100);
 }
 
-function computeItemSubtotal(item) {
-  return computeItemUnit(item) * item.quantity;
+function computeItemSubtotal(item, incPct, discPct) {
+  return computeItemUnit(item, incPct, discPct) * item.quantity;
 }
 
 function renderSaleItemsTable() {
@@ -246,20 +406,13 @@ function renderSaleItemsTable() {
         </td>
         <td>${item.size}</td>
         <td>${item.color}</td>
-        <td><input type="number" class="price-input" min="0" step="1" value="${item.priceList}" onchange="updateCartField(${idx},'priceList',this.value)"></td>
-        <td><input type="number" class="pct-input" min="0" value="${item.increasePct}" onchange="updateCartField(${idx},'increasePct',this.value)"></td>
-        <td><input type="number" class="pct-input" min="0" value="${item.discountPct}" onchange="updateCartField(${idx},'discountPct',this.value)"></td>
+        <td><input type="number" class="price-input" min="0" step="0.01" value="${item.priceList}" onchange="updateCartField(${idx},'priceList',this.value)"></td>
         <td>
           <div class="qty-stepper">
             <button type="button" onclick="changeQty(${idx},-1)">−</button>
             <input type="number" min="1" value="${item.quantity}" onchange="updateCartField(${idx},'quantity',this.value)">
             <button type="button" onclick="changeQty(${idx},1)">+</button>
           </div>
-        </td>
-        <td>
-          <select class="pay-select browser-default" onchange="updateCartField(${idx},'paymentMethod',this.value)">
-            ${PAYMENT_METHODS.map(m => `<option value="${m}" ${m === item.paymentMethod ? 'selected' : ''}>${m}</option>`).join('')}
-          </select>
         </td>
         <td><strong>${formatMoney(computeItemSubtotal(item))}</strong></td>
         <td><i class="material-icons" style="cursor:pointer;color:var(--danger);" onclick="removeCartItem(${idx})">close</i></td>
@@ -269,6 +422,14 @@ function renderSaleItemsTable() {
 
   const total = SALE_cart.reduce((sum, item) => sum + computeItemSubtotal(item), 0);
   document.getElementById('saleTotalAmount').textContent = formatMoney(total);
+}
+
+/* Refresca todas las vistas que dependen del carrito (paso 1 y paso 2),
+   sin importar cuál esté visible en este momento. */
+function refreshCartViews() {
+  renderSaleSearchResults();
+  renderSelectionSummary();
+  renderSaleItemsTable();
 }
 
 function updateCartField(idx, field, value) {
@@ -283,12 +444,10 @@ function updateCartField(idx, field, value) {
       q = max < 1 ? 1 : max;
     }
     item.quantity = q;
-  } else if (field === 'paymentMethod') {
-    item.paymentMethod = value;
   } else {
     item[field] = parseFloat(value) || 0;
   }
-  renderSaleItemsTable();
+  refreshCartViews();
 }
 
 function changeQty(idx, delta) {
@@ -300,12 +459,12 @@ function changeQty(idx, delta) {
     return;
   }
   item.quantity = Math.max(1, newQty);
-  renderSaleItemsTable();
+  refreshCartViews();
 }
 
 function removeCartItem(idx) {
   SALE_cart.splice(idx, 1);
-  renderSaleItemsTable();
+  refreshCartViews();
 }
 
 function onSaveSaleClick() {
@@ -330,7 +489,19 @@ function saveNewSale() {
     }
   }
 
+  const customerResult = resolveSaleCustomer();
+  if (customerResult.error) {
+    M.toast({ html: customerResult.error });
+    return;
+  }
+
   if (!confirm('¿Confirmás registrar esta venta? Se descontará el stock automáticamente.')) return;
+
+  if (customerResult.isNewCustomer) {
+    const customers = DB.getCustomers();
+    customers.push({ id: uid('cust'), phone: customerResult.phone, name: customerResult.name, active: true, createdAt: nowISO() });
+    DB.setCustomers(customers);
+  }
 
   const variants = DB.getVariants();
   SALE_cart.forEach(item => {
@@ -346,6 +517,11 @@ function saveNewSale() {
     branchId: VENTAS_session.branchId,
     userId: VENTAS_session.userId,
     userName: VENTAS_session.name,
+    customerPhone: customerResult.phone,
+    customerName: customerResult.name,
+    increasePct: SALE_increasePct,
+    discountPct: SALE_discountPct,
+    paymentMethod: SALE_paymentMethod,
     items: SALE_cart.map(item => ({
       variantId: item.variantId,
       productId: item.productId,
@@ -355,11 +531,8 @@ function saveNewSale() {
       color: item.color,
       photo: item.photo,
       priceList: item.priceList,
-      increasePct: item.increasePct,
-      discountPct: item.discountPct,
       unitPrice: computeItemUnit(item),
       quantity: item.quantity,
-      paymentMethod: item.paymentMethod,
       subtotal: computeItemSubtotal(item)
     })),
     total,
@@ -413,18 +586,35 @@ function buildEditDiff() {
       saleChanges.push(`Cantidad de <strong>${n.name}</strong> (talle ${n.size}): ${o.quantity} → ${n.quantity}.`);
     }
 
-    const oldUnit = computeItemUnit(o);
-    const newUnit = computeItemUnit(n);
-    if (Math.abs(oldUnit - newUnit) > 0.001) {
-      saleChanges.push(`Precio unitario de <strong>${n.name}</strong> (talle ${n.size}): ${formatMoney(oldUnit)} → ${formatMoney(newUnit)}.`);
-    }
-
-    if (o.paymentMethod !== n.paymentMethod) {
-      saleChanges.push(`Método de pago de <strong>${n.name}</strong> (talle ${n.size}): ${o.paymentMethod} → ${n.paymentMethod}.`);
+    const oldBase = Number(o.priceList) || 0;
+    const newBase = Number(n.priceList) || 0;
+    if (Math.abs(oldBase - newBase) > 0.001) {
+      saleChanges.push(`Precio base de <strong>${n.name}</strong> (talle ${n.size}): ${formatMoney(oldBase)} → ${formatMoney(newBase)}.`);
     }
   });
 
-  return { stockMoves, saleChanges };
+  // Cambios en el porcentaje y método de pago globales de la venta
+  const origInc = SALE_editOriginalGlobal.increasePct || 0;
+  const origDisc = SALE_editOriginalGlobal.discountPct || 0;
+  if (origInc !== SALE_increasePct || origDisc !== SALE_discountPct) {
+    saleChanges.push(`Porcentaje aplicado a toda la venta: aumento ${origInc}% → ${SALE_increasePct}%, descuento ${origDisc}% → ${SALE_discountPct}%.`);
+  }
+  if (SALE_editOriginalGlobal.paymentMethod !== SALE_paymentMethod) {
+    saleChanges.push(`Método de pago de la venta: ${SALE_editOriginalGlobal.paymentMethod} → ${SALE_paymentMethod}.`);
+  }
+
+  // Cambios en el cliente de la venta
+  const customerResult = resolveSaleCustomer();
+  if (!customerResult.error) {
+    const origPhone = SALE_editOriginalCustomer.phone;
+    const origName = SALE_editOriginalCustomer.name;
+    if (origPhone !== customerResult.phone || origName !== customerResult.name) {
+      const describe = (phone, name) => name ? (phone ? `${name} (${phone})` : name) : (phone ? phone : 'Sin datos (anónimo)');
+      saleChanges.push(`Cliente: ${describe(origPhone, origName)} → ${describe(customerResult.phone, customerResult.name)}.`);
+    }
+  }
+
+  return { stockMoves, saleChanges, customerResult };
 }
 
 function handleSaveEditedSale() {
@@ -433,7 +623,11 @@ function handleSaveEditedSale() {
     return;
   }
 
-  const { stockMoves, saleChanges } = buildEditDiff();
+  const { stockMoves, saleChanges, customerResult } = buildEditDiff();
+  if (customerResult.error) {
+    M.toast({ html: customerResult.error });
+    return;
+  }
   if (stockMoves.length === 0 && saleChanges.length === 0) {
     M.toast({ html: 'No se detectaron cambios en la venta.' });
     return;
@@ -445,7 +639,7 @@ function handleSaveEditedSale() {
   for (const move of stockMoves) {
     if (move.delta > 0) {
       const v = variants.find(v => v.id === move.variantId);
-      const current = v && v.stock[branchId] ? v.stock[branchId].current : 0;
+      const current = v ? availableStock(v.stock[branchId]) : 0;
       if (move.delta > current) {
         M.toast({ html: `Stock insuficiente para ${move.name} (talle ${move.size}). Disponible: ${current}.` });
         return;
@@ -470,7 +664,7 @@ function handleSaveEditedSale() {
 }
 
 function applyEditSale() {
-  const { stockMoves } = buildEditDiff();
+  const { stockMoves, customerResult } = buildEditDiff();
   const variants = DB.getVariants();
   const branchId = VENTAS_session.branchId;
 
@@ -481,9 +675,20 @@ function applyEditSale() {
   });
   DB.setVariants(variants);
 
+  if (customerResult.isNewCustomer) {
+    const customers = DB.getCustomers();
+    customers.push({ id: uid('cust'), phone: customerResult.phone, name: customerResult.name, active: true, createdAt: nowISO() });
+    DB.setCustomers(customers);
+  }
+
   const sales = DB.getSales();
   const sale = sales.find(s => s.id === SALE_editMode);
   if (sale) {
+    sale.increasePct = SALE_increasePct;
+    sale.discountPct = SALE_discountPct;
+    sale.paymentMethod = SALE_paymentMethod;
+    sale.customerPhone = customerResult.phone;
+    sale.customerName = customerResult.name;
     sale.items = SALE_cart.map(item => ({
       variantId: item.variantId,
       productId: item.productId,
@@ -493,11 +698,8 @@ function applyEditSale() {
       color: item.color,
       photo: item.photo,
       priceList: item.priceList,
-      increasePct: item.increasePct,
-      discountPct: item.discountPct,
       unitPrice: computeItemUnit(item),
       quantity: item.quantity,
-      paymentMethod: item.paymentMethod,
       subtotal: computeItemSubtotal(item)
     }));
     sale.total = sale.items.reduce((sum, it) => sum + it.subtotal, 0);
@@ -628,6 +830,7 @@ function renderSalesTable() {
   tbody.innerHTML = sales.map(s => `
     <tr class="${s.voided ? 'voided-row' : ''}">
       <td>${formatDateTime(s.date)}</td>
+      <td>${s.customerName ? s.customerName : '<span style="color:var(--text-muted);">Anónimo</span>'}</td>
       <td>${s.userName}</td>
       <td>${DB.getBranchName(s.branchId)}</td>
       <td><strong>${formatMoney(s.total)}</strong></td>
@@ -650,7 +853,12 @@ function openSaleDetail(saleId) {
     <strong>Fecha:</strong> ${formatDateTime(sale.date)} &nbsp;·&nbsp;
     <strong>Usuario:</strong> ${sale.userName} &nbsp;·&nbsp;
     <strong>Sucursal:</strong> ${DB.getBranchName(sale.branchId)}
+    <br><strong>Cliente:</strong> ${sale.customerName ? sale.customerName : 'Anónimo'}${sale.customerPhone ? ' · ' + sale.customerPhone : ''}
+    <br><strong>Método de pago:</strong> ${sale.paymentMethod || '—'}
   `;
+  if (sale.increasePct || sale.discountPct) {
+    metaHtml += `<br><strong>% aplicado a la venta:</strong> aumento ${sale.increasePct || 0}% · descuento ${sale.discountPct || 0}%`;
+  }
   if (sale.editedAt) {
     metaHtml += `<br><strong>Última modificación:</strong> ${formatDateTime(sale.editedAt)} por ${sale.editedBy}`;
   }

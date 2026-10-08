@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clientes · Atelier Stock</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4>Clientes</h4>
+          <div class="page-sub">Clientes registrados a partir de las ventas o cargados manualmente</div>
+        </div>
+        <button class="btn btn-gold waves-effect" id="btnOpenAddCustomer"><i class="material-icons left">person_add</i>Registrar cliente</button>
+      </div>
+
+      <div class="card-panel">
+        <div class="filters-bar">
+          <div class="filter-field" style="min-width:220px;">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Buscar por nombre</label>
+            <input type="text" id="searchName" placeholder="Ej: María, Juan...">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Buscar por teléfono</label>
+            <input type="text" id="searchPhone" placeholder="Ej: 1122334455">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Estado</label>
+            <select id="searchStatus" class="browser-default">
+              <option value="">Todos los estados</option>
+              <option value="activo">Activo</option>
+              <option value="baja">De baja</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <button class="btn btn-flat waves-effect" id="btnClearFilters">Limpiar filtros</button>
+          </div>
+        </div>
+
+        <table class="data-table responsive-table" style="margin-top:14px;">
+          <thead>
+            <tr><th>Nombre</th><th>Teléfono</th><th>Cliente desde</th><th>Estado</th></tr>
+          </thead>
+          <tbody id="customersTbody"></tbody>
+        </table>
+        <div id="noCustomersMsg" class="empty-state" style="display:none;">
+          <i class="material-icons">contacts</i>
+          <div>No hay clientes para mostrar con los filtros actuales</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: registrar cliente -->
+  <div id="modalAddCustomer" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Registrar nuevo cliente</p>
+      <div class="input-field">
+        <input id="add_c_name" type="text">
+        <label for="add_c_name">Nombre completo</label>
+      </div>
+      <div class="input-field">
+        <input id="add_c_phone" type="tel">
+        <label for="add_c_phone">Teléfono (dato único)</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnSaveNewCustomer">Registrar</button>
+    </div>
+  </div>
+
+  <!-- Modal: editar cliente -->
+  <div id="modalEditCustomer" class="modal">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <p class="modal-title">Editar cliente</p>
+        <span id="edit_c_inactiveTag" class="inactive-tag" style="display:none;">Cliente dado de baja</span>
+      </div>
+      <input type="hidden" id="edit_c_id">
+      <div class="input-field">
+        <input id="edit_c_name" type="text">
+        <label for="edit_c_name" class="active">Nombre completo</label>
+      </div>
+      <div class="input-field">
+        <input id="edit_c_phone" type="tel">
+        <label for="edit_c_phone" class="active">Teléfono (dato único)</label>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.8rem;">Las ventas ya registradas con este cliente no se ven afectadas por estos cambios.</p>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;">
+      <button class="btn btn-danger waves-effect" id="btnDeactivateCustomer"><i class="material-icons left">block</i>Dar de baja</button>
+      <div>
+        <a href="#!" class="modal-close btn btn-flat">Descartar</a>
+        <button class="btn btn-gold waves-effect" id="btnSaveEditCustomer">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/clientes.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ventas · SICO</title>
+  <title>Ventas · Atelier Stock</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -17,9 +17,14 @@
     .pick-result-item { display:flex; align-items:center; gap:12px; padding:10px; border-radius:8px; cursor:pointer; }
     .pick-result-item:hover { background: var(--gold-100); }
     .pick-result-item img { width:44px;height:44px;border-radius:6px;object-fit:cover; }
-    .size-btn { display:inline-block; padding:6px 12px; margin:3px; border:1.5px solid var(--border-soft); border-radius:6px; cursor:pointer; font-size:0.82rem; }
+    .size-btn { display:inline-block; padding:6px 12px; margin:3px 3px 3px 0; border:1.5px solid var(--border-soft); border-radius:6px; cursor:pointer; font-size:0.8rem; }
     .size-btn:hover { border-color: var(--gold-500); background: var(--gold-100); }
     .size-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+    .size-btn.in-cart { border-color: var(--gold-500); background: var(--gold-100); font-weight: 600; }
+    .search-product-row { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-soft); }
+    .search-product-row img { width:48px; height:48px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+    .selection-row { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+    .selection-row:last-child { border-bottom:none; }
     .diff-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-soft); font-size:0.86rem; }
     .diff-row:last-child { border-bottom:none; }
     .void-item-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
@@ -63,7 +68,7 @@
 
         <table class="data-table responsive-table" style="margin-top:14px;">
           <thead>
-            <tr><th>Fecha y hora</th><th>Usuario</th><th>Sucursal</th><th>Monto total</th><th>Estado</th><th></th></tr>
+            <tr><th>Fecha y hora</th><th>Cliente</th><th>Usuario</th><th>Sucursal</th><th>Monto total</th><th>Estado</th><th></th></tr>
           </thead>
           <tbody id="salesTbody"></tbody>
         </table>
@@ -75,58 +80,93 @@
     </div>
   </div>
 
-  <!-- Modal: nueva venta -->
-  <div id="modalNewSale" class="modal modal-fixed-footer" style="width:100%;">
+  <!-- Modal: nueva venta / modificar venta (wizard de 2 pasos) -->
+  <div id="modalNewSale" class="modal modal-fixed-footer" style="max-width:900px;">
     <div class="modal-content">
       <p class="modal-title" id="saleModalTitle">Registrar venta</p>
       <p style="color:var(--text-muted);font-size:0.85rem;">Sucursal: <strong id="newSaleBranch"></strong></p>
 
-      <button class="btn btn-flat waves-effect" id="btnAddSaleItem" style="border:1.5px solid var(--navy-800);margin:10px 0;">
-        <i class="material-icons left">add_shopping_cart</i>Agregar producto
-      </button>
+      <!-- Paso 1: selección de productos por lotes -->
+      <div id="saleStepSelect">
+        <p style="font-weight:600;margin:16px 0 6px;">Cliente (opcional)</p>
+        <div class="row" style="margin-bottom:0;">
+          <div class="input-field col s12 m5">
+            <input type="tel" id="saleCustomerPhone" placeholder="Ej: 11-2345-6789">
+            <label class="active" for="saleCustomerPhone">Teléfono del cliente</label>
+          </div>
+          <div class="input-field col s12 m5">
+            <input type="text" id="saleCustomerName" placeholder="Nombre del cliente">
+            <label class="active" for="saleCustomerName">Nombre del cliente</label>
+          </div>
+          <div class="col s12 m2" style="display:flex;align-items:center;min-height:3rem;">
+            <span id="saleCustomerStatus" style="font-size:0.76rem;"></span>
+          </div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.78rem;margin-top:-6px;margin-bottom:14px;">
+          Si ingresás un teléfono ya registrado, se autocompleta el nombre. Un teléfono nuevo registra al cliente en el sistema. Podés dejar ambos campos vacíos para una venta anónima.
+        </p>
 
-      <div style="overflow-x:auto;">
-        <table class="data-table" style="min-width:820px;">
-          <thead>
-            <tr>
-              <th>Producto</th><th>Talle</th><th>Color</th><th>Precio</th><th>Aum. %</th><th>Desc. %</th><th>Cantidad</th><th>Método de pago</th><th>Subtotal</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="saleItemsTbody"></tbody>
-        </table>
-      </div>
-      <div id="noItemsMsg" class="empty-state" style="padding:24px;">
-        <i class="material-icons">shopping_bag</i>
-        <div>Todavía no agregaste productos a la venta</div>
+        <div class="input-field" style="margin-top:0;margin-bottom:4px;">
+          <i class="material-icons prefix">search</i>
+          <input type="text" id="saleSearchInput" placeholder="Buscar producto por nombre...">
+        </div>
+        <div id="saleSearchResults" style="max-height:260px;overflow-y:auto;margin-bottom:10px;"></div>
+
+        <p style="font-weight:600;margin:18px 0 6px;">Productos seleccionados</p>
+        <div id="saleSelectionSummary"></div>
+        <div id="noSelectionMsg" class="empty-state" style="padding:20px;">
+          <i class="material-icons">shopping_bag</i>
+          <div>Todavía no seleccionaste productos. Tocá un talle de la lista de arriba para agregarlo.</div>
+        </div>
       </div>
 
-      <div class="sale-total-bar">
-        <span style="color:var(--text-muted);">Total de la venta:</span>
-        <span class="total-amount" id="saleTotalAmount">$0,00</span>
+      <!-- Paso 2: porcentaje global, precio unitario y pago -->
+      <div id="saleStepPricing" style="display:none;">
+        <div class="row" style="margin:16px 0 0;">
+          <div class="input-field col s12 m4">
+            <input type="number" min="0" id="saleIncreasePct" value="0">
+            <label class="active" for="saleIncreasePct">Aumento (%) sobre toda la venta</label>
+          </div>
+          <div class="input-field col s12 m4">
+            <input type="number" min="0" id="saleDiscountPct" value="0">
+            <label class="active" for="saleDiscountPct">Descuento (%) sobre toda la venta</label>
+          </div>
+          <div class="input-field col s12 m4">
+            <select id="salePaymentMethod" class="browser-default"></select>
+            <label class="active" for="salePaymentMethod">Método de pago de la venta</label>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="data-table" style="min-width:680px;">
+            <thead>
+              <tr>
+                <th>Producto</th><th>Talle</th><th>Color</th><th>Precio unit.</th><th>Cantidad</th><th>Subtotal</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="saleItemsTbody"></tbody>
+          </table>
+        </div>
+        <div id="noItemsMsg" class="empty-state" style="padding:24px;">
+          <i class="material-icons">shopping_bag</i>
+          <div>Todavía no agregaste productos a la venta</div>
+        </div>
+
+        <div class="sale-total-bar">
+          <span style="color:var(--text-muted);">Total de la venta:</span>
+          <span class="total-amount" id="saleTotalAmount">$0,00</span>
+        </div>
       </div>
     </div>
-    <div class="modal-footer">
-      <a href="#!" class="modal-close btn btn-flat" id="btnCancelSale">Cancelar</a>
-      <button class="btn btn-gold waves-effect" id="btnSaveSale">Guardar venta</button>
-    </div>
-  </div>
-
-  <!-- Modal: buscar producto para agregar a la venta -->
-  <div id="modalPickProduct" class="modal">
-    <div class="modal-content">
-      <p class="modal-title">Buscar producto</p>
-      <div class="input-field">
-        <i class="material-icons prefix">search</i>
-        <input type="text" id="pickSearchInput" placeholder="Buscar por nombre...">
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+      <a href="#!" class="btn btn-flat" id="btnSaleBack" style="display:none;">
+        <i class="material-icons left">arrow_back</i>Agregar más productos
+      </a>
+      <div style="margin-left:auto;">
+        <a href="#!" class="modal-close btn btn-flat" id="btnCancelSale">Cancelar</a>
+        <button class="btn btn-gold waves-effect" id="btnSaleContinue">Continuar</button>
+        <button class="btn btn-gold waves-effect" id="btnSaveSale" style="display:none;">Guardar venta</button>
       </div>
-      <div id="pickResultsList" style="max-height:280px;overflow-y:auto;"></div>
-      <div id="pickSizesWrap" style="display:none;margin-top:16px;">
-        <p style="font-weight:600;margin-bottom:6px;">Elegí el talle</p>
-        <div id="pickSizesList"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <a href="#!" class="modal-close btn btn-flat">Cerrar</a>
     </div>
   </div>
 
@@ -169,7 +209,7 @@
           <i class="material-icons left">edit</i>Modificar
         </button>
         <button class="btn btn-danger waves-effect" id="btnOpenVoidSale">
-          <i class="material-icons left">undo</i>Anular (devolución)
+          <i class="material-icons left">undo</i>Anular
         </button>
       </div>
       <a href="#!" class="modal-close btn btn-flat">Cerrar</a>

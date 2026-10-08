@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devoluciones · Atelier Stock</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .sale-item-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
+    .price-input { width: 100px !important; margin: 0 !important; }
+    .size-btn { display:inline-block; padding:6px 12px; margin:3px 3px 3px 0; border:1.5px solid var(--border-soft); border-radius:6px; cursor:pointer; font-size:0.8rem; }
+    .size-btn:hover { border-color: var(--gold-500); background: var(--gold-100); }
+    .size-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+    .size-btn.in-cart { border-color: var(--gold-500); background: var(--gold-100); font-weight: 600; }
+    .search-product-row { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-soft); }
+    .search-product-row img { width:48px; height:48px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+    .selection-row { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+    .selection-row:last-child { border-bottom:none; }
+    .diff-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-soft); font-size:0.86rem; }
+    .diff-row:last-child { border-bottom:none; }
+    .return-type-option { display:flex; align-items:flex-start; gap:14px; padding:18px; border:1.5px solid var(--border-soft); border-radius:10px; margin-bottom:12px; cursor:pointer; transition:all 0.15s ease; }
+    .return-type-option:hover { border-color: var(--gold-500); background: var(--gold-100); }
+    .return-type-option i { color: var(--navy-800); font-size:28px; }
+    .return-type-option .rt-name { font-weight:700; color:var(--navy-900); margin-bottom:3px; }
+    .return-type-option .rt-sub { font-size:0.8rem; color:var(--text-muted); }
+    .type-chip { font-size:0.72rem; font-weight:700; padding:3px 10px; border-radius:12px; }
+    .type-chip.exchange { background:var(--gold-100); color:#7A5A17; }
+    .type-chip.defect { background:rgba(179,69,44,0.12); color:var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4>Devoluciones</h4>
+          <div class="page-sub">Cambios de producto y devoluciones por falla. No están asociadas a las ventas.</div>
+        </div>
+        <button class="btn btn-gold waves-effect" id="btnNewReturn"><i class="material-icons left">assignment_return</i>Registrar devolución</button>
+      </div>
+
+      <div class="card-panel">
+        <div class="filters-bar">
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Desde</label>
+            <input type="datetime-local" id="filterDateMin">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Hasta</label>
+            <input type="datetime-local" id="filterDateMax">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Tipo</label>
+            <select id="filterType" class="browser-default">
+              <option value="">Todos los tipos</option>
+              <option value="exchange">Cambio de producto</option>
+              <option value="defect">Devolución por falla</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <button class="btn btn-flat waves-effect" id="btnClearFilters">Limpiar filtros</button>
+          </div>
+        </div>
+
+        <table class="data-table responsive-table" style="margin-top:14px;">
+          <thead>
+            <tr><th>Fecha y hora</th><th>Tipo</th><th>Usuario</th><th>Productos</th><th>Diferencia abonada</th><th>Monto de reembolso</th><th></th></tr>
+          </thead>
+          <tbody id="returnsTbody"></tbody>
+        </table>
+        <div id="noReturnsMsg" class="empty-state" style="display:none;">
+          <i class="material-icons">assignment_return</i>
+          <div>No se encontraron devoluciones con los filtros aplicados</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: elegir tipo de devolución -->
+  <div id="modalReturnType" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Registrar devolución</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;">Elegí el tipo de devolución</p>
+
+      <div class="return-type-option" onclick="startExchangeReturn()">
+        <i class="material-icons">swap_horiz</i>
+        <div>
+          <div class="rt-name">Cambio de producto</div>
+          <div class="rt-sub">El cliente devuelve uno o más productos (vuelven al stock) y se lleva otros a cambio. Si lo que se lleva vale más, paga la diferencia; si vale menos, no se le reembolsa nada.</div>
+        </div>
+      </div>
+
+      <div class="return-type-option" onclick="startDefectReturn()">
+        <i class="material-icons">report_problem</i>
+        <div>
+          <div class="rt-name">Devolución por falla</div>
+          <div class="rt-sub">El cliente devuelve uno o más productos fallados. No vuelven al stock, pero quedan registrados, y se le reembolsa el importe.</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+    </div>
+  </div>
+
+  <!-- Modal: cambio de producto (2 pasos) -->
+  <div id="modalExchangeReturn" class="modal modal-fixed-footer" style="max-width:900px;">
+    <div class="modal-content">
+      <p class="modal-title">Cambio de producto</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Sucursal: <strong id="exchangeBranch"></strong></p>
+
+      <!-- Paso 1: productos devueltos por el cliente -->
+      <div id="exchangeStepReceived">
+        <p style="font-weight:600;margin:16px 0 6px;">Productos que devuelve el cliente</p>
+        <div class="input-field" style="margin-bottom:4px;">
+          <i class="material-icons prefix">search</i>
+          <input type="text" id="devReceivedSearchInput" placeholder="Buscar producto por nombre...">
+        </div>
+        <div id="devReceivedSearchResults" style="max-height:220px;overflow-y:auto;margin-bottom:10px;"></div>
+
+        <p style="font-weight:600;margin:18px 0 6px;">Seleccionados</p>
+        <div id="devReceivedSelection"></div>
+        <div id="noReceivedMsg" class="empty-state" style="padding:20px;">
+          <i class="material-icons">keyboard_return</i>
+          <div>Todavía no agregaste productos devueltos por el cliente.</div>
+        </div>
+      </div>
+
+      <!-- Paso 2: productos a entregar + diferencia -->
+      <div id="exchangeStepDelivered" style="display:none;">
+        <p style="font-weight:600;margin:16px 0 6px;">Productos a entregar al cliente</p>
+        <div class="input-field" style="margin-bottom:4px;">
+          <i class="material-icons prefix">search</i>
+          <input type="text" id="devDeliveredSearchInput" placeholder="Buscar producto por nombre...">
+        </div>
+        <div id="devDeliveredSearchResults" style="max-height:220px;overflow-y:auto;margin-bottom:10px;"></div>
+
+        <p style="font-weight:600;margin:18px 0 6px;">Seleccionados</p>
+        <div id="devDeliveredSelection"></div>
+        <div id="noDeliveredMsg" class="empty-state" style="padding:20px;">
+          <i class="material-icons">shopping_bag</i>
+          <div>Todavía no agregaste productos para entregar al cliente.</div>
+        </div>
+
+        <div class="card-panel" style="margin-top:18px;background:#FAFAF9;">
+          <div class="diff-row"><span>Total productos devueltos</span><strong id="exchangeTotalReceived">$0,00</strong></div>
+          <div class="diff-row"><span>Total productos entregados</span><strong id="exchangeTotalDelivered">$0,00</strong></div>
+
+          <div id="exchangeDiffPayWrap" style="display:none;margin-top:10px;">
+            <div class="diff-row"><span>Diferencia a pagar por el cliente</span><strong id="exchangeDiffAmount" style="color:var(--danger);">$0,00</strong></div>
+            <div class="input-field col s12 m6" style="margin-top:6px;">
+              <select id="exchangeDiffPaymentMethod" class="browser-default"></select>
+              <label class="active">Método de pago de la diferencia</label>
+            </div>
+          </div>
+          <p id="exchangeNoRefundNote" style="display:none;color:var(--text-muted);font-size:0.85rem;margin-top:10px;"></p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+      <a href="#!" class="btn btn-flat" id="btnExchangeBack" style="display:none;">
+        <i class="material-icons left">arrow_back</i>Volver
+      </a>
+      <div style="margin-left:auto;">
+        <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+        <button class="btn btn-gold waves-effect" id="btnExchangeContinue">Continuar</button>
+        <button class="btn btn-gold waves-effect" id="btnSaveExchange" style="display:none;">Guardar devolución</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: devolución por falla -->
+  <div id="modalDefectReturn" class="modal modal-fixed-footer" style="max-width:800px;">
+    <div class="modal-content">
+      <p class="modal-title">Devolución por falla</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Sucursal: <strong id="defectBranch"></strong></p>
+
+      <p style="font-weight:600;margin:16px 0 6px;">Productos fallados recibidos</p>
+      <div class="input-field" style="margin-bottom:4px;">
+        <i class="material-icons prefix">search</i>
+        <input type="text" id="devDefectSearchInput" placeholder="Buscar producto por nombre...">
+      </div>
+      <div id="devDefectSearchResults" style="max-height:220px;overflow-y:auto;margin-bottom:10px;"></div>
+
+      <p style="font-weight:600;margin:18px 0 6px;">Seleccionados</p>
+      <div id="devDefectSelection"></div>
+      <div id="noDefectMsg" class="empty-state" style="padding:20px;">
+        <i class="material-icons">report_problem</i>
+        <div>Todavía no agregaste productos fallados.</div>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.8rem;margin-top:6px;">Estos productos no vuelven a ingresar al stock, pero quedan registrados en esta devolución.</p>
+
+      <div class="sale-total-bar">
+        <span style="color:var(--text-muted);">Monto total a reembolsar:</span>
+        <span class="total-amount" id="defectTotalAmount">$0,00</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnSaveDefect">Guardar devolución</button>
+    </div>
+  </div>
+
+  <!-- Modal: confirmar cambio de producto -->
+  <div id="modalConfirmExchange" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Confirmar cambio de producto</p>
+      <div id="confirmExchangeList"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnAcceptExchange">Aceptar</button>
+    </div>
+  </div>
+
+  <!-- Modal: confirmar devolución por falla -->
+  <div id="modalConfirmDefect" class="modal">
+    <div class="modal-content">
+      <p class="modal-title">Confirmar devolución por falla</p>
+      <div id="confirmDefectList"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnAcceptDefect">Aceptar</button>
+    </div>
+  </div>
+
+  <!-- Modal: detalle de devolución -->
+  <div id="modalReturnDetail" class="modal modal-fixed-footer">
+    <div class="modal-content">
+      <p class="modal-title">Detalle de devolución</p>
+      <div id="returnDetailMeta" style="color:var(--text-muted);font-size:0.88rem;margin-bottom:14px;"></div>
+      <div id="returnDetailBody"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cerrar</a>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/devoluciones.js"></script>
+</body>
+</html>

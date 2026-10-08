@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedidos · Atelier Stock</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .sale-item-row td { vertical-align: middle; }
+    .sale-item-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
+    .price-input { width: 100px !important; margin: 0 !important; }
+    .size-btn { display:inline-block; padding:6px 12px; margin:3px 3px 3px 0; border:1.5px solid var(--border-soft); border-radius:6px; cursor:pointer; font-size:0.8rem; }
+    .size-btn:hover { border-color: var(--gold-500); background: var(--gold-100); }
+    .size-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+    .size-btn.in-cart { border-color: var(--gold-500); background: var(--gold-100); font-weight: 600; }
+    .search-product-row { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-soft); }
+    .search-product-row img { width:48px; height:48px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+    .selection-row { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+    .selection-row:last-child { border-bottom:none; }
+    .diff-row { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); font-size:0.86rem; }
+    .diff-row:last-child { border-bottom:none; }
+    .status-chip { font-size:0.72rem; font-weight:700; padding:3px 10px; border-radius:12px; white-space:nowrap; }
+    .status-chip.pendiente { background:var(--gold-100); color:#7A5A17; }
+    .status-chip.confirmado { background:rgba(38,49,63,0.12); color:var(--navy-800); }
+    .status-chip.entregado { background:rgba(62,120,86,0.14); color:var(--success); }
+    .status-chip.rechazado { background:rgba(179,69,44,0.12); color:var(--danger); }
+    .order-id { font-family: 'Poppins', sans-serif; font-weight:600; letter-spacing:0.5px; color:var(--navy-900); }
+    textarea.materialize-textarea { min-height: 3rem; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h4>Pedidos</h4>
+          <div class="page-sub">Pedidos de clientes con retiro o envío. Al confirmarse, reservan el stock.</div>
+        </div>
+        <button class="btn btn-gold waves-effect" id="btnNewOrder"><i class="material-icons left">add_shopping_cart</i>Registrar pedido</button>
+      </div>
+
+      <div class="card-panel">
+        <div class="filters-bar">
+          <div class="filter-field" style="min-width:170px;">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Identificador</label>
+            <input type="text" id="filterOrderId" placeholder="Ej: PED-7K3Q9X">
+          </div>
+          <div class="filter-field" style="min-width:200px;">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Nombre del cliente</label>
+            <input type="text" id="filterCustomerName" placeholder="Ej: María">
+          </div>
+          <div class="filter-field">
+            <label style="font-size:0.75rem;color:var(--text-muted);">Estado</label>
+            <select id="filterStatus" class="browser-default">
+              <option value="activos">Pendientes y confirmados</option>
+              <option value="pendiente">Solo pendientes</option>
+              <option value="confirmado">Solo confirmados</option>
+              <option value="entregado">Entregados</option>
+              <option value="rechazado">Rechazados</option>
+              <option value="todos">Todos (incluye entregados y rechazados)</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <button class="btn btn-flat waves-effect" id="btnClearFilters">Limpiar filtros</button>
+          </div>
+        </div>
+
+        <table class="data-table responsive-table" style="margin-top:14px;">
+          <thead>
+            <tr><th>Identificador</th><th>Fecha y hora</th><th>Cliente</th><th>Teléfono</th><th>Entrega</th><th>Total</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody id="ordersTbody"></tbody>
+        </table>
+        <div id="noOrdersMsg" class="empty-state" style="display:none;">
+          <i class="material-icons">local_shipping</i>
+          <div>No se encontraron pedidos con los filtros aplicados</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: nuevo pedido / modificar pedido (wizard de 2 pasos) -->
+  <div id="modalOrder" class="modal modal-fixed-footer" style="max-width:900px;">
+    <div class="modal-content">
+      <p class="modal-title" id="orderModalTitle">Registrar pedido</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Sucursal: <strong id="orderBranch"></strong><span id="orderModalIdLabel"></span></p>
+
+      <!-- Paso 1: cliente y selección de productos por lotes -->
+      <div id="orderStepSelect">
+        <p style="font-weight:600;margin:16px 0 6px;">Cliente</p>
+        <div class="row" style="margin-bottom:0;">
+          <div class="input-field col s12 m5">
+            <input type="tel" id="orderCustomerPhone" placeholder="Ej: 11-2345-6789">
+            <label class="active" for="orderCustomerPhone">Teléfono del cliente</label>
+          </div>
+          <div class="input-field col s12 m5">
+            <input type="text" id="orderCustomerName" placeholder="Nombre del cliente">
+            <label class="active" for="orderCustomerName">Nombre del cliente</label>
+          </div>
+          <div class="col s12 m2" style="display:flex;align-items:center;min-height:3rem;">
+            <span id="orderCustomerStatus" style="font-size:0.76rem;"></span>
+          </div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.78rem;margin-top:-6px;margin-bottom:14px;">
+          Nombre y teléfono son obligatorios. Un teléfono nuevo registra al cliente en el sistema con el nombre ingresado; el nombre no se autocompleta.
+        </p>
+
+        <div class="input-field" style="margin-top:0;margin-bottom:4px;">
+          <i class="material-icons prefix">search</i>
+          <input type="text" id="orderSearchInput" placeholder="Buscar producto por nombre...">
+        </div>
+        <div id="orderSearchResults" style="max-height:260px;overflow-y:auto;margin-bottom:10px;"></div>
+
+        <p style="font-weight:600;margin:18px 0 6px;">Productos seleccionados</p>
+        <div id="orderSelectionSummary"></div>
+        <div id="noOrderSelectionMsg" class="empty-state" style="padding:20px;">
+          <i class="material-icons">shopping_bag</i>
+          <div>Todavía no seleccionaste productos. Tocá un talle de la lista de arriba para agregarlo.</div>
+        </div>
+      </div>
+
+      <!-- Paso 2: precios, % global, pago, entrega -->
+      <div id="orderStepPricing" style="display:none;">
+        <div class="row" style="margin:16px 0 0;">
+          <div class="input-field col s12 m4">
+            <input type="number" min="0" id="orderIncreasePct" value="0">
+            <label class="active" for="orderIncreasePct">Aumento (%) sobre todo el pedido</label>
+          </div>
+          <div class="input-field col s12 m4">
+            <input type="number" min="0" id="orderDiscountPct" value="0">
+            <label class="active" for="orderDiscountPct">Descuento (%) sobre todo el pedido</label>
+          </div>
+          <div class="input-field col s12 m4">
+            <select id="orderPaymentMethod" class="browser-default"></select>
+            <label class="active" for="orderPaymentMethod">Método de pago del pedido</label>
+          </div>
+        </div>
+
+        <div class="row" style="margin:0;">
+          <div class="input-field col s12 m4">
+            <select id="orderDeliveryType" class="browser-default">
+              <option value="retiro">Retiro en sucursal</option>
+              <option value="envio">Envío a domicilio</option>
+            </select>
+            <label class="active" for="orderDeliveryType">Tipo de entrega</label>
+          </div>
+          <div class="input-field col s12 m8" id="orderAddressWrap" style="display:none;">
+            <input type="text" id="orderAddress" placeholder="Calle, número, localidad">
+            <label class="active" for="orderAddress">Dirección de entrega</label>
+          </div>
+          <div class="input-field col s12">
+            <textarea id="orderNotes" class="materialize-textarea" placeholder="Aclaraciones para la entrega, referencias, horarios..."></textarea>
+            <label class="active" for="orderNotes">Aclaraciones (opcional)</label>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="data-table" style="min-width:680px;">
+            <thead>
+              <tr>
+                <th>Producto</th><th>Talle</th><th>Color</th><th>Precio unit.</th><th>Cantidad</th><th>Subtotal</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="orderItemsTbody"></tbody>
+          </table>
+        </div>
+        <div id="noOrderItemsMsg" class="empty-state" style="padding:24px;">
+          <i class="material-icons">shopping_bag</i>
+          <div>Todavía no agregaste productos al pedido</div>
+        </div>
+
+        <div class="sale-total-bar">
+          <span style="color:var(--text-muted);">Total del pedido:</span>
+          <span class="total-amount" id="orderTotalAmount">$0,00</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+      <a href="#!" class="btn btn-flat" id="btnOrderBack" style="display:none;">
+        <i class="material-icons left">arrow_back</i>Volver
+      </a>
+      <div style="margin-left:auto;">
+        <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+        <button class="btn btn-gold waves-effect" id="btnOrderContinue">Continuar</button>
+        <button class="btn btn-gold waves-effect" id="btnSaveOrder" style="display:none;">Guardar pedido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: detalle de pedido -->
+  <div id="modalOrderDetail" class="modal modal-fixed-footer">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <p class="modal-title">Pedido <span class="order-id" id="orderDetailIdLabel"></span></p>
+        <span id="orderDetailStatus"></span>
+      </div>
+      <div id="orderDetailMeta" style="color:var(--text-muted);font-size:0.88rem;margin-bottom:14px;line-height:1.7;"></div>
+      <table class="data-table">
+        <thead><tr><th>Producto</th><th>Talle</th><th>Cant.</th><th>Precio unit.</th><th>Subtotal</th></tr></thead>
+        <tbody id="orderDetailItems"></tbody>
+      </table>
+      <div class="sale-total-bar">
+        <span style="color:var(--text-muted);">Total:</span>
+        <span class="total-amount" id="orderDetailTotal">$0,00</span>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+      <div id="orderDetailActions" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-flat waves-effect" id="btnOrderEdit" style="border:1px solid var(--border-soft);">
+          <i class="material-icons left">edit</i>Modificar
+        </button>
+        <button class="btn btn-gold waves-effect" id="btnOrderConfirm">
+          <i class="material-icons left">paid</i>Confirmar (pagado)
+        </button>
+        <button class="btn btn-gold waves-effect" id="btnOrderDeliver">
+          <i class="material-icons left">done_all</i>Marcar como entregado
+        </button>
+        <button class="btn btn-danger waves-effect" id="btnOrderReject">
+          <i class="material-icons left">block</i>Rechazar
+        </button>
+      </div>
+      <a href="#!" class="modal-close btn btn-flat">Cerrar</a>
+    </div>
+  </div>
+
+  <!-- Modal: confirmar cambio de estado -->
+  <div id="modalConfirmOrderAction" class="modal">
+    <div class="modal-content">
+      <p class="modal-title" id="orderActionTitle">Confirmar</p>
+      <div id="orderActionBody"></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn btn-flat">Cancelar</a>
+      <button class="btn btn-gold waves-effect" id="btnAcceptOrderAction">Aceptar</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/pedidos.js"></script>
+</body>
+</html>

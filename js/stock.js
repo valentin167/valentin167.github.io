@@ -94,12 +94,13 @@ function buildVariantLinesHtml(product, branchId, onlyCritical) {
     if (onlyCritical && !isCritical) return null;
 
     const delta = STOCK_pendingDeltas[v.id] || 0;
-    const newVal = Math.max(0, st.current + delta);
+    const reserved = st.reserved || 0;
+    const newVal = Math.max(reserved, st.current + delta);
 
     return `
       <div class="variant-stock-line">
         <span class="v-size ${isCritical ? 'low-stock-text' : ''}">${v.size}</span>
-        <span class="v-info">Actual: <strong>${st.current}</strong> · Mín: ${st.critical}</span>
+        <span class="v-info">Actual: <strong>${st.current}</strong> · <span title="Disponible para ventas (stock actual menos lo reservado por pedidos confirmados)" style="color:var(--navy-800);font-weight:600;">Disp.: ${availableStock(st)}</span> · Mín: ${st.critical}</span>
         <div class="stock-adjust-row">
           <button type="button" class="adj-btn minus" onclick="adjustDelta('${v.id}', -1)">−</button>
           <input type="number" id="delta_${v.id}" value="${delta}" onchange="onDeltaTyped('${v.id}')">
@@ -157,6 +158,11 @@ function getVariantBaseCurrent(variantId) {
   return v ? v.stock[STOCK_session.branchId].current : 0;
 }
 
+function getVariantReserved(variantId) {
+  const v = DB.getVariants().find(v => v.id === variantId);
+  return v && v.stock[STOCK_session.branchId] ? (v.stock[STOCK_session.branchId].reserved || 0) : 0;
+}
+
 function adjustDelta(variantId, step) {
   const input = document.getElementById('delta_' + variantId);
   input.value = (parseInt(input.value) || 0) + step;
@@ -176,7 +182,7 @@ function updateDeltaDisplay(variantId) {
     STOCK_pendingDeltas[variantId] = delta;
   }
   const base = getVariantBaseCurrent(variantId);
-  const newVal = Math.max(0, base + delta);
+  const newVal = Math.max(getVariantReserved(variantId), base + delta);
   const newEl = document.getElementById('newstock_' + variantId);
   if (newEl) newEl.textContent = '→ ' + newVal;
 }
@@ -198,7 +204,7 @@ function onSaveChangesClick() {
     if (!v) return '';
     const p = products.find(p => p.id === v.productId);
     const base = v.stock[branchId].current;
-    const newVal = Math.max(0, base + delta);
+    const newVal = Math.max(v.stock[branchId].reserved || 0, base + delta);
     const sign = delta > 0 ? '+' : '';
     const colorClass = delta > 0 ? 'style="color:var(--success);font-weight:700;"' : 'style="color:var(--danger);font-weight:700;"';
     return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-soft);">
@@ -220,7 +226,8 @@ function onAcceptAdjustClick() {
     const v = variants.find(v => v.id === variantId);
     if (!v || !v.stock[branchId]) return;
     const base = v.stock[branchId].current;
-    v.stock[branchId].current = Math.max(0, base + delta);
+    // el stock físico no puede bajar de lo reservado por pedidos confirmados
+    v.stock[branchId].current = Math.max(v.stock[branchId].reserved || 0, base + delta);
   });
   DB.setVariants(variants);
 
@@ -292,7 +299,7 @@ function renderTransferQtyRows() {
     .sort((a, b) => SIZES.indexOf(a.size) - SIZES.indexOf(b.size));
 
   document.getElementById('transferQtyTbody').innerHTML = variants.map(v => {
-    const sourceStock = v.stock[branchId].current;
+    const sourceStock = availableStock(v.stock[branchId]);
     const qty = TRANSFER_qtyMap[v.id] || 0;
     return `
       <tr data-variant-id="${v.id}">
@@ -312,7 +319,7 @@ function renderTransferQtyRows() {
 
 function getTransferSourceStock(variantId) {
   const v = DB.getVariants().find(v => v.id === variantId);
-  return v && v.stock[STOCK_session.branchId] ? v.stock[STOCK_session.branchId].current : 0;
+  return v ? availableStock(v.stock[STOCK_session.branchId]) : 0;
 }
 
 function setTransferQty(variantId, qty) {
@@ -390,7 +397,12 @@ function applyTransfer() {
     v.stock[sourceBranchId].current = Math.max(0, v.stock[sourceBranchId].current - qty);
 
     if (!v.stock[destBranchId]) {
-      v.stock[destBranchId] = { current: 0, critical: v.stock[sourceBranchId].critical || 0 };
+      v.stock[destBranchId] = {
+        current: 0,
+        critical: v.stock[sourceBranchId].critical || 0,
+        reserved: 0,
+        price: v.stock[sourceBranchId].price || 0
+      };
     }
     v.stock[destBranchId].current += qty;
   });

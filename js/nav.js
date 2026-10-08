@@ -8,6 +8,9 @@ const NAV_ITEMS = [
   { key: 'stock', label: 'Stock', icon: 'inventory_2', href: 'stock.html', adminOnly: false },
   { key: 'critico', label: 'Stock crítico', icon: 'warning_amber', href: 'stock-critico.html', adminOnly: false },
   { key: 'ventas', label: 'Ventas', icon: 'point_of_sale', href: 'ventas.html', adminOnly: false },
+  { key: 'pedidos', label: 'Pedidos', icon: 'local_shipping', href: 'pedidos.html', adminOnly: false },
+  { key: 'devoluciones', label: 'Devoluciones', icon: 'assignment_return', href: 'devoluciones.html', adminOnly: false },
+  { key: 'clientes', label: 'Clientes', icon: 'contacts', href: 'clientes.html', adminOnly: false },
   { key: 'usuarios', label: 'Usuarios', icon: 'group', href: 'usuarios.html', adminOnly: true }
 ];
 
@@ -17,7 +20,6 @@ function nav_countCriticalForBranch(branchId) {
   let count = 0;
   variants.forEach(v => {
     const prod = products.find(p => p.id === v.productId);
-    console.log(prod)
     if (!prod || !prod.active || !prod.branchesSold.includes(branchId)) return;
     const st = v.stock[branchId];
     if (st && st.current <= st.critical) count++;
@@ -46,9 +48,9 @@ function nav_render(activeKey) {
   const sidebarHtml = `
     <div class="sidebar" id="mainSidebar">
       <div class="brand">
-        <div class="logo-mark">SICO</div>
+        <div class="logo-mark">AS</div>
         <div>
-          <div class="brand-text">SICO</div>
+          <div class="brand-text">Atelier Stock</div>
           <div class="brand-sub">Gestión de indumentaria</div>
         </div>
       </div>
@@ -84,7 +86,7 @@ function nav_render(activeKey) {
 
     <div class="mobile-topbar">
       <i class="material-icons" id="btnOpenSidebar" style="cursor:pointer;">menu</i>
-      <span style="font-family:'Poppins',sans-serif;font-weight:600;">SICO</span>
+      <span style="font-family:'Poppins',sans-serif;font-weight:600;">Atelier Stock</span>
     </div>
 
     <!-- Modal cambiar sucursal -->

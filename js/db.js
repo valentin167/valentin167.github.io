@@ -9,6 +9,9 @@ const DB_KEYS = {
   products: 'sa_products',
   variants: 'sa_variants',
   sales: 'sa_sales',
+  returns: 'sa_returns',
+  customers: 'sa_customers',
+  orders: 'sa_orders',
   session: 'sa_session',
   seeded: 'sa_seeded_v1'
 };
@@ -77,7 +80,7 @@ function seedDatabaseIfNeeded() {
   // Sucursales fijas
   const branches = [
     { id: 'suc_centro', name: 'Sucursal Centro' },
-    { id: 'suc_feria', name: 'Sucursal Feria' }
+    { id: 'suc_norte', name: 'Sucursal Norte' }
   ];
   dbSet(DB_KEYS.branches, branches);
 
@@ -127,6 +130,7 @@ function seedDatabaseIfNeeded() {
         stock[bId] = {
           current: def.initialStock !== undefined ? def.initialStock : Math.floor(Math.random() * 15) + 5,
           critical: def.criticalStock !== undefined ? def.criticalStock : 5,
+          reserved: 0,
           price: def.price
         };
       });
@@ -148,7 +152,7 @@ function seedDatabaseIfNeeded() {
     categories: ['Remeras'],
     imgColor: '#C79A3D',
     sizeMin: 'S', sizeMax: 'XL',
-    branchesSold: ['suc_centro', 'suc_feria'],
+    branchesSold: ['suc_centro', 'suc_norte'],
     initialStock: 12, criticalStock: 5
   });
 
@@ -160,7 +164,7 @@ function seedDatabaseIfNeeded() {
     categories: ['Pantalones'],
     imgColor: '#3B5B84',
     sizeMin: 'S', sizeMax: 'XXL',
-    branchesSold: ['suc_centro', 'suc_feria'],
+    branchesSold: ['suc_centro', 'suc_norte'],
     initialStock: 8, criticalStock: 4
   });
 
@@ -184,7 +188,7 @@ function seedDatabaseIfNeeded() {
     categories: ['Vestidos', 'Accesorios'],
     imgColor: '#B85C8A',
     sizeMin: 'XS', sizeMax: 'L',
-    branchesSold: ['suc_feria'],
+    branchesSold: ['suc_norte'],
     initialStock: 6, criticalStock: 3
   });
 
@@ -196,13 +200,16 @@ function seedDatabaseIfNeeded() {
     categories: ['Calzado'],
     imgColor: '#7A7A7A',
     sizeMin: 'S', sizeMax: 'M',
-    branchesSold: ['suc_centro', 'suc_feria'],
+    branchesSold: ['suc_centro', 'suc_norte'],
     initialStock: 2, criticalStock: 4
   });
 
   dbSet(DB_KEYS.products, products);
   dbSet(DB_KEYS.variants, variants);
   dbSet(DB_KEYS.sales, []);
+  dbSet(DB_KEYS.returns, []);
+  dbSet(DB_KEYS.customers, []);
+  dbSet(DB_KEYS.orders, []);
 
   dbSet(DB_KEYS.seeded, true);
 }
@@ -238,6 +245,16 @@ const DB = {
 
   getSales: () => dbGet(DB_KEYS.sales, []),
   setSales: (v) => dbSet(DB_KEYS.sales, v),
+
+  getReturns: () => dbGet(DB_KEYS.returns, []),
+  setReturns: (v) => dbSet(DB_KEYS.returns, v),
+
+  getOrders: () => dbGet(DB_KEYS.orders, []),
+  setOrders: (v) => dbSet(DB_KEYS.orders, v),
+
+  getCustomers: () => dbGet(DB_KEYS.customers, []),
+  setCustomers: (v) => dbSet(DB_KEYS.customers, v),
+  findCustomerByPhone: (phone) => dbGet(DB_KEYS.customers, []).find(c => c.phone === phone) || null,
 
   getSession: () => dbGet(DB_KEYS.session, null),
   setSession: (v) => dbSet(DB_KEYS.session, v),
@@ -284,3 +301,45 @@ function migrateProductPricingSchema() {
 }
 
 migrateProductPricingSchema();
+
+/* ---------- Migración: alta/baja lógica de clientes ----------
+   Clientes creados antes de que existiera el estado activo/inactivo no
+   tienen el campo `active`; se los considera activos por defecto. */
+function migrateCustomersSchema() {
+  const customers = dbGet(DB_KEYS.customers, []);
+  let changed = false;
+  customers.forEach(c => {
+    if (c.active === undefined) {
+      c.active = true;
+      changed = true;
+    }
+  });
+  if (changed) dbSet(DB_KEYS.customers, customers);
+}
+
+migrateCustomersSchema();
+
+/* ---------- Stock reservado por pedidos confirmados ----------
+   Cada entrada de stock por sucursal tiene `current` (físico) y `reserved`
+   (comprometido por pedidos confirmados que todavía no se entregaron).
+   Lo que se puede vender/entregar hoy es current - reserved. */
+function availableStock(stockEntry) {
+  if (!stockEntry) return 0;
+  return Math.max(0, (stockEntry.current || 0) - (stockEntry.reserved || 0));
+}
+
+function migrateReservedSchema() {
+  const variants = dbGet(DB_KEYS.variants, []);
+  let changed = false;
+  variants.forEach(v => {
+    Object.keys(v.stock || {}).forEach(bId => {
+      if (v.stock[bId].reserved === undefined) {
+        v.stock[bId].reserved = 0;
+        changed = true;
+      }
+    });
+  });
+  if (changed) dbSet(DB_KEYS.variants, variants);
+}
+
+migrateReservedSchema();

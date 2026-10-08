@@ -8,7 +8,6 @@ let editChipsInstance = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   PROD_session = nav_init('productos');
-  document.getElementById('branchLabel').textContent = DB.getBranchName(PROD_session.branchId);
   if (!PROD_session) return;
 
   fillSizeSelects('add_sizeMin', 'add_sizeMax');
@@ -85,7 +84,7 @@ function renderBasePriceInputs(prefix, existingBasePrice) {
 
   wrap.innerHTML = branches.map(bId => `
     <div class="input-field col s6 m4">
-      <input type="number" min="0" step="1" id="${prefix}_baseprice_${bId}"
+      <input type="number" min="0" step="0.01" id="${prefix}_baseprice_${bId}"
              value="${basePrice[bId] !== undefined ? basePrice[bId] : ''}"
              oninput="applyBasePriceToColumn('${prefix}', '${bId}')">
       <label class="active" for="${prefix}_baseprice_${bId}">Precio base — ${DB.getBranchName(bId)}</label>
@@ -152,7 +151,7 @@ function buildStockFieldsHtml(sizes, branches, existingVariants, prefix) {
       rows += `
         <td><input type="number" min="0" style="margin:0;" id="${prefix}_cur_${size}_${bId}" value="${currentVal}"></td>
         <td><input type="number" min="0" style="margin:0;" id="${prefix}_crit_${size}_${bId}" value="${criticalVal}"></td>
-        <td><input type="number" min="0" step="1" style="margin:0;" id="${prefix}_price_${size}_${bId}" value="${priceVal}"></td>
+        <td><input type="number" min="0" step="0.01" style="margin:0;" id="${prefix}_price_${size}_${bId}" value="${priceVal}"></td>
       `;
     });
     rows += '</tr>';
@@ -259,7 +258,7 @@ function saveNewProduct() {
       const crit = parseInt(document.getElementById(`add_crit_${size}_${bId}`).value) || 0;
       const priceEl = document.getElementById(`add_price_${size}_${bId}`);
       const price = priceEl && priceEl.value !== '' ? (parseFloat(priceEl.value) || 0) : basePrice[bId];
-      stock[bId] = { current: cur, critical: crit, price };
+      stock[bId] = { current: cur, critical: crit, reserved: 0, price };
     });
     variants.push({ id: uid('var'), productId: product.id, size, active: true, stock });
   });
@@ -423,9 +422,13 @@ function saveEditProduct() {
       const curEl = document.getElementById(`edit_cur_${size}_${bId}`);
       const critEl = document.getElementById(`edit_crit_${size}_${bId}`);
       const priceEl = document.getElementById(`edit_price_${size}_${bId}`);
+      const prevEntry = variant && variant.stock[bId] ? variant.stock[bId] : null;
+      const reserved = prevEntry ? (prevEntry.reserved || 0) : 0;
       stockData[bId] = {
-        current: curEl ? (parseInt(curEl.value) || 0) : 0,
+        // el stock físico nunca puede quedar por debajo de lo reservado por pedidos
+        current: Math.max(reserved, curEl ? (parseInt(curEl.value) || 0) : 0),
         critical: critEl ? (parseInt(critEl.value) || 0) : 0,
+        reserved,
         price: priceEl && priceEl.value !== '' ? (parseFloat(priceEl.value) || 0) : newBasePrice[bId]
       };
     });
