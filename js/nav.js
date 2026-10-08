@@ -48,9 +48,9 @@ function nav_render(activeKey) {
   const sidebarHtml = `
     <div class="sidebar" id="mainSidebar">
       <div class="brand">
-        <div class="logo-mark">AS</div>
+        <div class="logo-mark">SICO</div>
         <div>
-          <div class="brand-text">Atelier Stock</div>
+          <div class="brand-text">SICO</div>
           <div class="brand-sub">Gestión de indumentaria</div>
         </div>
       </div>
@@ -86,7 +86,7 @@ function nav_render(activeKey) {
 
     <div class="mobile-topbar">
       <i class="material-icons" id="btnOpenSidebar" style="cursor:pointer;">menu</i>
-      <span style="font-family:'Poppins',sans-serif;font-weight:600;">Atelier Stock</span>
+      <span style="font-family:'Poppins',sans-serif;font-weight:600;">SICO</span>
     </div>
 
     <!-- Modal cambiar sucursal -->
